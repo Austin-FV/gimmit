@@ -35,7 +35,7 @@ Then press **F5** in VS Code to open an Extension Development Host with the exte
 ### Open the panel
 
 - Open the Command Palette (`Cmd+Shift+P` / `Ctrl+Shift+P`)
-- Run: **Git Commit Helper: Open Panel**
+- Run: **gimmit: Open Panel**
 
 Or click the button in the Source Control (`Ctrl+Shift+G`) panel title bar.
 

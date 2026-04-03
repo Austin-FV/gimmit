@@ -63,149 +63,128 @@ function getWebviewContent(files: ChangedFile[]): string {
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>Git Commit Helper</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Syne:wght@700;800&display=swap');
-
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 
-  :root{
-    --bg:#0d0f14;
-    --surface:#13151c;
-    --surface2:#1a1d27;
-    --border:#22263a;
-    --border-bright:#363b52;
-    --text:#e2e8f0;
-    --muted:#5a6380;
-    --accent:#7c3aed;
-    --accent-soft:rgba(124,58,237,0.15);
-    --green:#4ade80;
-    --red:#f87171;
-    --blue:#60a5fa;
-    --orange:#fb923c;
-    --r:6px;
-    --mono:'JetBrains Mono',monospace;
-    --display:'Syne',sans-serif;
-  }
-
   body{
-    background:var(--bg);
-    color:var(--text);
-    font-family:var(--mono);
-    font-size:12px;
+    background:var(--vscode-sideBar-background);
+    color:var(--vscode-foreground);
+    font-family:var(--vscode-font-family);
+    font-size:var(--vscode-font-size);
     padding:12px;
     overflow-x:hidden;
   }
 
   .header{margin-bottom:14px}
   .header h1{
-    font-family:var(--display);
-    font-size:15px;
-    font-weight:800;
-    background:linear-gradient(120deg,#e2e8f0 30%,#7c3aed);
-    -webkit-background-clip:text;
-    -webkit-text-fill-color:transparent;
-    background-clip:text;
+    font-size:13px;
+    font-weight:600;
+    color:var(--vscode-foreground);
     margin-bottom:2px;
   }
-  .header p{color:var(--muted);font-size:10px}
+  .header p{color:var(--vscode-descriptionForeground);font-size:11px}
 
   .type-bar{
     display:flex;
     align-items:center;
-    gap:8px;
-    margin-bottom:12px;
-    background:var(--surface);
-    border:1px solid var(--border);
-    border-radius:var(--r);
-    padding:8px 10px;
+    gap:6px;
+    margin-bottom:10px;
+    background:var(--vscode-input-background);
+    border:1px solid var(--vscode-input-border, transparent);
+    border-radius:4px;
+    padding:6px 8px;
   }
   .type-bar label{
     font-size:10px;
-    color:var(--muted);
-    font-family:var(--display);
-    font-weight:700;
-    letter-spacing:0.1em;
+    color:var(--vscode-descriptionForeground);
+    font-weight:600;
+    letter-spacing:0.08em;
     text-transform:uppercase;
     white-space:nowrap;
   }
-  .type-chips{display:flex;flex-wrap:wrap;gap:4px;flex:1}
+  .type-chips{display:flex;flex-wrap:wrap;gap:3px;flex:1}
   .chip{
-    font-size:9px;
-    font-family:var(--display);
-    font-weight:700;
-    letter-spacing:0.06em;
-    padding:3px 8px;
-    border-radius:20px;
-    border:1px solid transparent;
+    font-size:10px;
+    padding:2px 8px;
+    border-radius:3px;
+    border:1px solid var(--vscode-button-secondaryBorder, transparent);
     cursor:pointer;
-    transition:all 0.15s;
-    background:var(--surface2);
-    color:var(--muted);
+    transition:all 0.1s;
+    background:transparent;
+    color:var(--vscode-descriptionForeground);
+    font-family:var(--vscode-font-family);
   }
-  .chip:hover{color:var(--text);border-color:var(--border-bright)}
-  .chip.active{color:#000;border-color:transparent}
+  .chip:hover{
+    background:var(--vscode-toolbar-hoverBackground);
+    color:var(--vscode-foreground);
+  }
+  .chip.active{
+    background:var(--vscode-button-background);
+    color:var(--vscode-button-foreground);
+    border-color:transparent;
+  }
 
   .list-header{
     display:flex;
     align-items:center;
     justify-content:space-between;
-    margin-bottom:6px;
+    margin-bottom:5px;
   }
   .list-label{
-    font-family:var(--display);
     font-size:10px;
-    font-weight:700;
-    letter-spacing:0.1em;
+    font-weight:600;
+    letter-spacing:0.08em;
     text-transform:uppercase;
-    color:var(--muted);
+    color:var(--vscode-descriptionForeground);
   }
   .quick-links{display:flex;gap:8px}
   .quick-links a{
-    font-size:10px;
-    color:var(--muted);
+    font-size:11px;
+    color:var(--vscode-textLink-foreground);
     cursor:pointer;
-    text-decoration:underline;
-    text-underline-offset:2px;
+    text-decoration:none;
   }
-  .quick-links a:hover{color:var(--text)}
+  .quick-links a:hover{text-decoration:underline}
 
-  .file-list{display:flex;flex-direction:column;gap:3px;margin-bottom:14px}
+  .file-list{display:flex;flex-direction:column;gap:2px;margin-bottom:12px}
 
   .file-row{
     display:flex;
     align-items:center;
-    gap:8px;
-    background:var(--surface);
-    border:1px solid var(--border);
-    border-radius:var(--r);
-    padding:7px 10px;
+    gap:6px;
+    border-radius:3px;
+    padding:5px 8px;
     cursor:pointer;
-    transition:border-color 0.12s,background 0.12s;
+    transition:background 0.1s;
     user-select:none;
+    border:1px solid transparent;
   }
-  .file-row:hover{border-color:var(--border-bright);background:var(--surface2)}
-  .file-row.selected{border-color:var(--accent);background:var(--accent-soft)}
+  .file-row:hover{background:var(--vscode-list-hoverBackground)}
+  .file-row.selected{
+    background:var(--vscode-list-activeSelectionBackground);
+    color:var(--vscode-list-activeSelectionForeground);
+  }
 
-  .file-row input[type="checkbox"]{ display:none; }
+  .file-row input[type="checkbox"]{display:none}
 
   .custom-check{
     width:14px;height:14px;
-    border:1.5px solid var(--border-bright);
-    border-radius:3px;
+    border:1px solid var(--vscode-checkbox-border, var(--vscode-foreground));
+    border-radius:2px;
     flex-shrink:0;
     display:flex;
     align-items:center;
     justify-content:center;
-    transition:border-color 0.12s, background 0.12s;
-    background:var(--surface2);
+    background:var(--vscode-checkbox-background, transparent);
+    transition:background 0.1s, border-color 0.1s;
   }
   .file-row.selected .custom-check{
-    background:var(--accent);
-    border-color:var(--accent);
+    background:var(--vscode-checkbox-selectBackground, var(--vscode-button-background));
+    border-color:var(--vscode-checkbox-selectBorder, var(--vscode-button-background));
   }
   .file-row.selected .custom-check::after{
     content:'';
     width:4px;height:7px;
-    border:1.5px solid #fff;
+    border:1.5px solid var(--vscode-button-foreground, #fff);
     border-top:none;
     border-left:none;
     transform:rotate(45deg) translateY(-1px);
@@ -222,120 +201,125 @@ function getWebviewContent(files: ChangedFile[]): string {
 
   .file-info{flex:1;min-width:0}
   .file-name{
-    font-size:11px;
-    color:var(--text);
+    font-size:12px;
     white-space:nowrap;
     overflow:hidden;
     text-overflow:ellipsis;
   }
+  .file-row.selected .file-name{color:var(--vscode-list-activeSelectionForeground)}
   .file-dir{
-    font-size:9px;
-    color:var(--muted);
+    font-size:10px;
+    color:var(--vscode-descriptionForeground);
     white-space:nowrap;
     overflow:hidden;
     text-overflow:ellipsis;
     margin-top:1px;
   }
+  .file-row.selected .file-dir{opacity:0.8}
 
   .file-hint{
-    font-size:9px;
-    font-family:var(--display);
-    font-weight:700;
-    color:var(--muted);
+    font-size:10px;
+    color:var(--vscode-descriptionForeground);
     flex-shrink:0;
-    opacity:0.55;
+    opacity:0.6;
   }
 
-  .msg-section{margin-bottom:12px}
+  .msg-section{margin-bottom:10px}
   .section-label{
-    font-family:var(--display);
     font-size:10px;
-    font-weight:700;
-    letter-spacing:0.1em;
+    font-weight:600;
+    letter-spacing:0.08em;
     text-transform:uppercase;
-    color:var(--muted);
-    margin-bottom:5px;
+    color:var(--vscode-descriptionForeground);
+    margin-bottom:4px;
   }
   .msg-wrap{position:relative}
   .msg-edit{
     width:100%;
-    background:var(--surface);
-    border:1px solid var(--border);
-    border-radius:var(--r);
-    color:var(--text);
-    font-family:var(--mono);
-    font-size:11px;
-    padding:8px 10px;
-    padding-right:60px;
+    background:var(--vscode-input-background);
+    border:1px solid var(--vscode-input-border, transparent);
+    border-radius:3px;
+    color:var(--vscode-input-foreground);
+    font-family:var(--vscode-font-family);
+    font-size:12px;
+    padding:6px 8px;
+    padding-right:58px;
     resize:none;
     outline:none;
     line-height:1.5;
-    transition:border-color 0.12s;
   }
-  .msg-edit:focus{border-color:var(--accent)}
+  .msg-edit:focus{border-color:var(--vscode-focusBorder)}
 
   .regen-btn{
     position:absolute;
-    top:6px;right:6px;
-    font-size:9px;
-    font-family:var(--display);
-    font-weight:700;
-    letter-spacing:0.06em;
-    background:var(--surface2);
-    border:1px solid var(--border);
-    border-radius:4px;
-    color:var(--muted);
-    padding:3px 7px;
+    top:5px;right:5px;
+    font-size:10px;
+    background:transparent;
+    border:1px solid var(--vscode-button-secondaryBorder, var(--vscode-input-border));
+    border-radius:3px;
+    color:var(--vscode-descriptionForeground);
+    padding:2px 6px;
     cursor:pointer;
-    text-transform:uppercase;
-    transition:color 0.12s,border-color 0.12s;
+    font-family:var(--vscode-font-family);
+    transition:background 0.1s;
   }
-  .regen-btn:hover{color:var(--text);border-color:var(--accent)}
+  .regen-btn:hover{background:var(--vscode-toolbar-hoverBackground);color:var(--vscode-foreground)}
 
-  .cmd-section{margin-bottom:12px}
+  .cmd-section{margin-bottom:10px}
   .cmd-box{
     position:relative;
-    background:#090b10;
-    border:1px solid var(--border);
-    border-radius:var(--r);
-    padding:10px 12px;
+    background:var(--vscode-textCodeBlock-background, var(--vscode-input-background));
+    border:1px solid var(--vscode-input-border, transparent);
+    border-radius:3px;
+    padding:8px 10px;
     font-size:11px;
+    font-family:var(--vscode-editor-font-family);
     line-height:2;
     white-space:pre;
     overflow-x:auto;
   }
   .cmd-line{display:block}
-  .ck{color:#7c3aed}.cf{color:#60a5fa}.cs{color:#4ade80}.cp{color:#e2e8f0}
+  .ck{color:var(--vscode-symbolIcon-keywordForeground, #569cd6)}
+  .cf{color:var(--vscode-symbolIcon-variableForeground, #9cdcfe)}
+  .cs{color:var(--vscode-symbolIcon-stringForeground, #ce9178)}
+  .cp{color:var(--vscode-foreground)}
 
   .copy-btn{
     position:absolute;
-    top:7px;right:7px;
-    font-family:var(--display);
-    font-size:9px;
-    font-weight:700;
-    letter-spacing:0.08em;
-    text-transform:uppercase;
-    background:var(--surface2);
-    border:1px solid var(--border);
-    border-radius:4px;
-    color:var(--muted);
-    padding:3px 8px;
+    top:6px;right:6px;
+    font-size:10px;
+    background:var(--vscode-button-secondaryBackground, transparent);
+    border:1px solid var(--vscode-button-secondaryBorder, var(--vscode-input-border));
+    border-radius:3px;
+    color:var(--vscode-button-secondaryForeground, var(--vscode-foreground));
+    padding:2px 8px;
     cursor:pointer;
-    transition:color 0.12s,border-color 0.12s;
+    font-family:var(--vscode-font-family);
+    transition:background 0.1s;
   }
-  .copy-btn:hover{color:var(--text);border-color:var(--accent)}
-  .copy-btn.ok{color:var(--green);border-color:var(--green)}
+  .copy-btn:hover{background:var(--vscode-button-secondaryHoverBackground)}
+  .copy-btn.ok{
+    color:var(--vscode-terminal-ansiGreen, #4ade80);
+    border-color:var(--vscode-terminal-ansiGreen, #4ade80);
+  }
 
-  .empty{text-align:center;padding:28px 0;color:var(--muted);font-size:11px;line-height:1.8}
-  .empty span{font-size:20px;display:block;margin-bottom:8px}
+  .empty{
+    text-align:center;
+    padding:24px 0;
+    color:var(--vscode-descriptionForeground);
+    font-size:12px;
+    line-height:1.8;
+  }
 
   .live-badge{
-    font-size:9px;font-family:var(--display);font-weight:700;
-    letter-spacing:0.06em;color:var(--green);opacity:0.7;
+    font-size:10px;
+    color:var(--vscode-terminal-ansiGreen, #4ade80);
+    opacity:0.8;
   }
   .pulse{
     display:inline-block;width:5px;height:5px;border-radius:50%;
-    background:var(--green);margin-right:4px;vertical-align:middle;
+    background:var(--vscode-terminal-ansiGreen, #4ade80);
+    margin-right:3px;vertical-align:middle;
     animation:pulse 2s ease-in-out infinite;
   }
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
@@ -343,7 +327,7 @@ function getWebviewContent(files: ChangedFile[]): string {
 </head>
 <body>
 <div class="header">
-  <h1>Git Commit Helper</h1>
+  <h1>gimmit</h1>
   <p>Select files · pick type · copy command</p>
 </div>
 <div id="root"></div>
@@ -377,11 +361,8 @@ function inferDominantType(fs) {
 
 function buildMsg(selected, type) {
   if (!selected.length) return '';
-  const dirs = selected.map(f => { const p=f.filepath.split('/'); return p.length>1?p[0]:''; }).filter(Boolean);
-  const freqD = {};
-  dirs.forEach(d => freqD[d]=(freqD[d]||0)+1);
-  const topDir = Object.entries(freqD).sort((a,b)=>b[1]-a[1])[0];
-  const scope = topDir ? topDir[0] : '';
+  const dirs = [...new Set(selected.map(f => { const p=f.filepath.split('/'); return p.length>1?p[0]:''; }).filter(Boolean))];
+  const scope = dirs.length === 1 ? dirs[0] : '';
   const names = selected.map(f => f.filepath.split('/').pop().replace(/\.[^.]+$/, ''));
   let desc;
   if (names.length === 1) {
@@ -578,7 +559,7 @@ render();
 // ─── Sidebar Provider ─────────────────────────────────────────────────────────
 
 class GitCommitViewProvider implements vscode.WebviewViewProvider {
-  public static readonly viewType = "gitCommitHelper.sidebar";
+  public static readonly viewType = "gimmit.sidebar";
   private _view?: vscode.WebviewView;
   private _watcher?: fs.FSWatcher;
   private _disposables: vscode.Disposable[] = [];
@@ -659,8 +640,8 @@ export function activate(context: vscode.ExtensionContext) {
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand("gitCommitHelper.open", () => {
-      vscode.commands.executeCommand("gitCommitHelper.sidebar.focus");
+    vscode.commands.registerCommand("gimmit.open", () => {
+      vscode.commands.executeCommand("gimmit.sidebar.focus");
     })
   );
 }

@@ -1,6 +1,6 @@
 {
-  "name": "git-commit-helper",
-  "displayName": "Git Commit Helper",
+  "name": "gimmit",
+  "displayName": "gimmit",
   "description": "Select modified files and generate conventional commit commands — live updating sidebar.",
   "version": "0.1.0",
   "engines": { "vscode": "^1.85.0" },
@@ -10,16 +10,16 @@
   "contributes": {
     "commands": [
       {
-        "command": "gitCommitHelper.open",
-        "title": "Git Commit Helper: Open Sidebar"
+        "command": "gimmit.open",
+        "title": "gimmit: Open Sidebar"
       }
     ],
     "views": {
       "scm": [
         {
           "type": "webview",
-          "id": "gitCommitHelper.sidebar",
-          "name": "Commit Helper",
+          "id": "gimmit.sidebar",
+          "name": "gimmit",
           "when": "true"
         }
       ]

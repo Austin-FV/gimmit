@@ -281,6 +281,76 @@ function getWebviewContent(files: ChangedFile[]): string {
   }
   .regen-btn:hover{background:var(--vscode-toolbar-hoverBackground);color:var(--vscode-foreground)}
 
+  .footer-row{
+    display:flex;
+    align-items:center;
+    gap:4px;
+    margin-bottom:4px;
+  }
+  .footer-select{
+    background:var(--vscode-input-background);
+    border:1px solid var(--vscode-input-border, transparent);
+    border-radius:3px;
+    color:var(--vscode-input-foreground);
+    font-family:var(--vscode-font-family);
+    font-size:11px;
+    padding:4px 6px;
+    cursor:pointer;
+    outline:none;
+    flex-shrink:0;
+  }
+  .footer-select:focus{border-color:var(--vscode-focusBorder)}
+  .footer-token-input{
+    background:var(--vscode-input-background);
+    border:1px solid var(--vscode-input-border, transparent);
+    border-radius:3px;
+    color:var(--vscode-input-foreground);
+    font-family:var(--vscode-font-family);
+    font-size:11px;
+    padding:4px 6px;
+    outline:none;
+    width:90px;
+    flex-shrink:0;
+  }
+  .footer-token-input:focus{border-color:var(--vscode-focusBorder)}
+  .footer-value-input{
+    background:var(--vscode-input-background);
+    border:1px solid var(--vscode-input-border, transparent);
+    border-radius:3px;
+    color:var(--vscode-input-foreground);
+    font-family:var(--vscode-font-family);
+    font-size:11px;
+    padding:4px 6px;
+    outline:none;
+    flex:1;
+    min-width:0;
+  }
+  .footer-value-input:focus{border-color:var(--vscode-focusBorder)}
+  .footer-remove{
+    background:transparent;
+    border:none;
+    color:var(--vscode-descriptionForeground);
+    cursor:pointer;
+    font-size:14px;
+    padding:0 2px;
+    line-height:1;
+    flex-shrink:0;
+    opacity:0.6;
+  }
+  .footer-remove:hover{color:var(--vscode-errorForeground);opacity:1}
+  .add-footer-btn{
+    font-size:10px;
+    background:transparent;
+    border:none;
+    color:var(--vscode-textLink-foreground);
+    cursor:pointer;
+    font-family:var(--vscode-font-family);
+    padding:0;
+    margin-top:2px;
+    display:block;
+  }
+  .add-footer-btn:hover{text-decoration:underline}
+
   .cmd-section{margin-bottom:10px}
   .cmd-box{
     position:relative;
@@ -371,6 +441,7 @@ let showBody = false;
 let commitBody = '';
 let breakingChange = false;
 let breakingMsg = '';
+let footers = []; // [{id, token, customToken, value}]
 let commitMsg  = buildMsg(files.filter(f => selectedPaths.has(f.filepath)), commitType);
 
 function inferDominantType(fs) {
@@ -426,7 +497,7 @@ function buildBody(selected) {
   }).join(String.fromCharCode(10));
 }
 
-function buildCmd(selected, msg, body, breaking, breakingMsg) {
+function buildCmd(selected, msg, body, breaking, brkMsg, footers) {
   if (!selected.length) return '';
   const paths = selected.map(f => f.filepath).join(' ');
   const safe = msg.replace(/"/g, String.fromCharCode(92) + '"');
@@ -436,9 +507,19 @@ function buildCmd(selected, msg, body, breaking, breakingMsg) {
     const safeBody = body.replace(/"/g, String.fromCharCode(92) + '"');
     cmd += ' -m "' + safeBody + '"';
   }
-  if (breaking && breakingMsg.trim()) {
-    const safeBreaking = breakingMsg.replace(/"/g, String.fromCharCode(92) + '"');
-    cmd += ' -m "BREAKING CHANGE: ' + safeBreaking + '"';
+  // Collect all footer lines into one -m block (spec-compliant)
+  const footerLines = [];
+  if (breaking && brkMsg.trim()) {
+    footerLines.push('BREAKING CHANGE: ' + brkMsg.replace(/"/g, String.fromCharCode(92) + '"'));
+  }
+  footers.forEach(f => {
+    const token = f.token === 'Custom' ? f.customToken : f.token;
+    if (token && token.trim() && f.value.trim()) {
+      footerLines.push(token + ': ' + f.value.replace(/"/g, String.fromCharCode(92) + '"'));
+    }
+  });
+  if (footerLines.length) {
+    cmd += ' -m "' + footerLines.join(NL) + '"';
   }
   return cmd;
 }
@@ -504,8 +585,10 @@ function render() {
     '</div>';
   }).join('');
 
-  const cmd = buildCmd(selected, commitMsg, showBody ? commitBody : '', breakingChange, breakingMsg);
+  const cmd = buildCmd(selected, commitMsg, showBody ? commitBody : '', breakingChange, breakingMsg, footers);
   const cmdHtml = cmd ? highlightCmd(cmd) : '<span class="cp" style="opacity:0.4">select files above</span>';
+
+  const FOOTER_TOKENS = ['Refs', 'Closes', 'Fixes', 'Co-authored-by', 'Reviewed-by', 'See-also', 'Custom'];
 
   const bodySection =
     '<div class="msg-section">'+
@@ -534,6 +617,34 @@ function render() {
       : '')+
     '</div>';
 
+  const footerRows = footers.map((f, i) => {
+    const tokenOpts = FOOTER_TOKENS.map(t =>
+      '<option value="'+t+'"'+(f.token===t?' selected':'')+'>'+t+'</option>'
+    ).join('');
+    return '<div class="footer-row">'+
+      '<select class="footer-select" data-idx="'+i+'" onchange="updateFooterToken(+this.dataset.idx,this.value)">'+tokenOpts+'</select>'+
+      (f.token === 'Custom' ?
+        '<input class="footer-token-input" placeholder="token" value="'+esc(f.customToken)+'" data-idx="'+i+'" oninput="updateFooterCustomToken(+this.dataset.idx,this.value)"/>'
+      : '')+
+      '<input class="footer-value-input" placeholder="value" value="'+esc(f.value)+'" data-idx="'+i+'" oninput="updateFooterValue(+this.dataset.idx,this.value)"/>'+
+      '<button class="footer-remove" data-idx="'+i+'" onclick="removeFooter(+this.dataset.idx)" title="Remove">×</button>'+
+    '</div>';
+  }).join('');
+
+  const footerSection =
+  '<div class="msg-section">'+
+    '<div class="section-label-row">'+
+      '<span class="section-label">Footers</span>'+
+      '<div style="display:flex;gap:8px;align-items:center">'+
+        (footers.length ?
+          '<button class="toggle-btn" style="color:var(--vscode-descriptionForeground)" onclick="clearFooters()">clear all</button>'
+        : '')+
+        '<button class="toggle-btn" onclick="addFooter()">▸ add footer</button>'+
+      '</div>'+
+    '</div>'+
+    footerRows+
+  '</div>';
+
   root.innerHTML =
     '<div class="type-bar">'+
       '<label>TYPE</label>'+
@@ -553,6 +664,7 @@ function render() {
       '</div>'+
     '</div>'+
     bodySection+
+    footerSection+
     breakingSection+
     '<div class="cmd-section">'+
       '<div class="section-label">Git Command</div>'+
@@ -603,7 +715,7 @@ function onMsgEdit(val) {
   userEditedMsg = true;
   commitMsg = val;
   const sel = files.filter(f => selectedPaths.has(f.filepath));
-  const cmd = buildCmd(sel, val, showBody ? commitBody : '', breakingChange, breakingMsg);
+  const cmd = buildCmd(sel, val, showBody ? commitBody : '', breakingChange, breakingMsg, footers);
   const box = document.getElementById('cmdBox');
   if (box) {
     box.innerHTML = '<button class="copy-btn" id="copyBtn" onclick="copyCmd()">COPY</button>'+
@@ -613,7 +725,7 @@ function onMsgEdit(val) {
 
 function copyCmd() {
   const sel = files.filter(f => selectedPaths.has(f.filepath));
-  const cmd = buildCmd(sel, commitMsg, showBody ? commitBody : '', breakingChange, breakingMsg);
+  const cmd = buildCmd(sel, commitMsg, showBody ? commitBody : '', breakingChange, breakingMsg, footers);
   if (!cmd) return;
   navigator.clipboard.writeText(cmd).then(() => {
     const btn = document.getElementById('copyBtn');
@@ -657,7 +769,7 @@ function regenBody() {
 function onBodyEdit(val) {
   commitBody = val;
   const sel = files.filter(f => selectedPaths.has(f.filepath));
-  const cmd = buildCmd(sel, commitMsg, val, breakingChange, breakingMsg);
+  const cmd = buildCmd(sel, commitMsg, val, breakingChange, breakingMsg, footers);
   const box = document.getElementById('cmdBox');
   if (box) {
     box.innerHTML = '<button class="copy-btn" id="copyBtn" onclick="copyCmd()">COPY</button>'+
@@ -677,7 +789,48 @@ function toggleBreaking() {
 function onBreakingEdit(val) {
   breakingMsg = val;
   const sel = files.filter(f => selectedPaths.has(f.filepath));
-  const cmd = buildCmd(sel, commitMsg, showBody ? commitBody : '', true, val);
+  const cmd = buildCmd(sel, commitMsg, showBody ? commitBody : '', true, val, footers);
+  const box = document.getElementById('cmdBox');
+  if (box) {
+    box.innerHTML = '<button class="copy-btn" id="copyBtn" onclick="copyCmd()">COPY</button>'+
+      (cmd ? highlightCmd(cmd) : '<span class="cp" style="opacity:0.4">select files above</span>');
+  }
+}
+
+let _footerId = 0;
+function addFooter() {
+  footers.push({ id: _footerId++, token: 'Refs', customToken: '', value: '' });
+  render();
+}
+
+function removeFooter(idx) {
+  footers.splice(idx, 1);
+  render();
+}
+
+function clearFooters() {
+  footers = [];
+  render();
+}
+
+function updateFooterToken(idx, token) {
+  footers[idx].token = token;
+  render();
+}
+
+function updateFooterCustomToken(idx, val) {
+  footers[idx].customToken = val;
+  refreshCmd();
+}
+
+function updateFooterValue(idx, val) {
+  footers[idx].value = val;
+  refreshCmd();
+}
+
+function refreshCmd() {
+  const sel = files.filter(f => selectedPaths.has(f.filepath));
+  const cmd = buildCmd(sel, commitMsg, showBody ? commitBody : '', breakingChange, breakingMsg, footers);
   const box = document.getElementById('cmdBox');
   if (box) {
     box.innerHTML = '<button class="copy-btn" id="copyBtn" onclick="copyCmd()">COPY</button>'+

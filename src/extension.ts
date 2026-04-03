@@ -366,10 +366,12 @@ const ALL_TYPES = Object.keys(TYPE_META);
 let files = ${filesJson};
 let selectedPaths = new Set(files.map(f => f.filepath));
 let commitType = inferDominantType(files);
-let commitMsg  = buildMsg(files.filter(f => selectedPaths.has(f.filepath)), commitType);
 let userEditedMsg = false;
 let showBody = false;
 let commitBody = '';
+let breakingChange = false;
+let breakingMsg = '';
+let commitMsg  = buildMsg(files.filter(f => selectedPaths.has(f.filepath)), commitType);
 
 function inferDominantType(fs) {
   if (!fs.length) return 'feat';
@@ -411,7 +413,8 @@ function buildMsg(selected, type) {
     else if (type==='refactor') desc='refactor '+names.length+' files';
     else                        desc='update '+names.length+' files';
   }
-  return type+(scope?'('+scope+')':'')+': '+desc;
+  const prefix = type + (scope ? '('+scope+')' : '');
+  return (breakingChange ? prefix + '!' : prefix) + ': ' + desc;
 }
 
 function buildBody(selected) {
@@ -419,11 +422,11 @@ function buildBody(selected) {
   const statusLabel = { M:'Modified', A:'Added', D:'Deleted', R:'Renamed', '?':'Untracked' };
   return selected.map(f => {
     const st = statusLabel[f.status] || 'Changed';
-    return '- ' + f.filepath + ' [' + st + ']';
+    return '- ' + f.filepath + ' [' + st + ', ' + f.suggestedType + ']';
   }).join(String.fromCharCode(10));
 }
 
-function buildCmd(selected, msg, body) {
+function buildCmd(selected, msg, body, breaking, breakingMsg) {
   if (!selected.length) return '';
   const paths = selected.map(f => f.filepath).join(' ');
   const safe = msg.replace(/"/g, String.fromCharCode(92) + '"');
@@ -432,6 +435,10 @@ function buildCmd(selected, msg, body) {
   if (body && body.trim()) {
     const safeBody = body.replace(/"/g, String.fromCharCode(92) + '"');
     cmd += ' -m "' + safeBody + '"';
+  }
+  if (breaking && breakingMsg.trim()) {
+    const safeBreaking = breakingMsg.replace(/"/g, String.fromCharCode(92) + '"');
+    cmd += ' -m "BREAKING CHANGE: ' + safeBreaking + '"';
   }
   return cmd;
 }
@@ -497,7 +504,7 @@ function render() {
     '</div>';
   }).join('');
 
-  const cmd = buildCmd(selected, commitMsg, showBody ? commitBody : '');
+  const cmd = buildCmd(selected, commitMsg, showBody ? commitBody : '', breakingChange, breakingMsg);
   const cmdHtml = cmd ? highlightCmd(cmd) : '<span class="cp" style="opacity:0.4">select files above</span>';
 
   const bodySection =
@@ -510,6 +517,19 @@ function render() {
         '<div class="msg-wrap">'+
           '<textarea class="msg-edit" rows="4" id="bodyEdit" oninput="onBodyEdit(this.value)">'+esc(commitBody)+'</textarea>'+
           '<button class="regen-btn" onclick="regenBody()">↺ regen</button>'+
+        '</div>'
+      : '')+
+    '</div>';
+
+  const breakingSection =
+    '<div class="msg-section">'+
+      '<div class="section-label-row">'+
+        '<span class="section-label" style="color:var(--vscode-errorForeground)">⚠ Breaking Change</span>'+
+        '<button class="toggle-btn" onclick="toggleBreaking()">'+(breakingChange ? '▾ remove' : '▸ add')+'</button>'+
+      '</div>'+
+      (breakingChange ?
+        '<div class="msg-wrap">'+
+          '<textarea class="msg-edit" rows="2" id="breakingEdit" placeholder="describe what breaks and how to migrate..." oninput="onBreakingEdit(this.value)">'+esc(breakingMsg)+'</textarea>'+
         '</div>'
       : '')+
     '</div>';
@@ -533,6 +553,7 @@ function render() {
       '</div>'+
     '</div>'+
     bodySection+
+    breakingSection+
     '<div class="cmd-section">'+
       '<div class="section-label">Git Command</div>'+
       '<div class="cmd-box" id="cmdBox">'+
@@ -546,6 +567,7 @@ function setType(t) {
   if (!userEditedMsg) {
     commitMsg = buildMsg(files.filter(f => selectedPaths.has(f.filepath)), commitType);
   }
+  if (showBody) commitBody = buildBody(files.filter(f => selectedPaths.has(f.filepath)));
   render();
 }
 
@@ -581,7 +603,7 @@ function onMsgEdit(val) {
   userEditedMsg = true;
   commitMsg = val;
   const sel = files.filter(f => selectedPaths.has(f.filepath));
-  const cmd = buildCmd(sel, val, showBody ? commitBody : '');
+  const cmd = buildCmd(sel, val, showBody ? commitBody : '', breakingChange, breakingMsg);
   const box = document.getElementById('cmdBox');
   if (box) {
     box.innerHTML = '<button class="copy-btn" id="copyBtn" onclick="copyCmd()">COPY</button>'+
@@ -591,7 +613,7 @@ function onMsgEdit(val) {
 
 function copyCmd() {
   const sel = files.filter(f => selectedPaths.has(f.filepath));
-  const cmd = buildCmd(sel, commitMsg, showBody ? commitBody : '');
+  const cmd = buildCmd(sel, commitMsg, showBody ? commitBody : '', breakingChange, breakingMsg);
   if (!cmd) return;
   navigator.clipboard.writeText(cmd).then(() => {
     const btn = document.getElementById('copyBtn');
@@ -635,7 +657,27 @@ function regenBody() {
 function onBodyEdit(val) {
   commitBody = val;
   const sel = files.filter(f => selectedPaths.has(f.filepath));
-  const cmd = buildCmd(sel, commitMsg, val);
+  const cmd = buildCmd(sel, commitMsg, val, breakingChange, breakingMsg);
+  const box = document.getElementById('cmdBox');
+  if (box) {
+    box.innerHTML = '<button class="copy-btn" id="copyBtn" onclick="copyCmd()">COPY</button>'+
+      (cmd ? highlightCmd(cmd) : '<span class="cp" style="opacity:0.4">select files above</span>');
+  }
+}
+
+function toggleBreaking() {
+  breakingChange = !breakingChange;
+  if (!breakingChange) breakingMsg = '';
+  if (!userEditedMsg) {
+    commitMsg = buildMsg(files.filter(f => selectedPaths.has(f.filepath)), commitType);
+  }
+  render();
+}
+
+function onBreakingEdit(val) {
+  breakingMsg = val;
+  const sel = files.filter(f => selectedPaths.has(f.filepath));
+  const cmd = buildCmd(sel, commitMsg, showBody ? commitBody : '', true, val);
   const box = document.getElementById('cmdBox');
   if (box) {
     box.innerHTML = '<button class="copy-btn" id="copyBtn" onclick="copyCmd()">COPY</button>'+

@@ -1,0 +1,38 @@
+{
+  "name": "git-commit-helper",
+  "displayName": "Git Commit Helper",
+  "description": "Select modified files and generate conventional commit commands — live updating sidebar.",
+  "version": "0.1.0",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Other"],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "gitCommitHelper.open",
+        "title": "Git Commit Helper: Open Sidebar"
+      }
+    ],
+    "views": {
+      "scm": [
+        {
+          "type": "webview",
+          "id": "gitCommitHelper.sidebar",
+          "name": "Commit Helper",
+          "when": "true"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.0"
+  }
+}

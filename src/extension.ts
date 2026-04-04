@@ -269,6 +269,41 @@ function getWebviewContent(files: ChangedFile[]): string {
   }
   .msg-edit:focus{border-color:var(--vscode-focusBorder)}
 
+  .msg-input-row{
+    display:flex;
+    align-items:stretch;
+    background:var(--vscode-input-background);
+    border:1px solid var(--vscode-input-border, transparent);
+    border-radius:3px;
+    overflow:hidden;
+  }
+  .msg-input-row:focus-within{border-color:var(--vscode-focusBorder)}
+  .msg-prefix{
+    color:var(--vscode-input-foreground);
+    opacity:0.55;
+    font-family:var(--vscode-font-family);
+    font-size:12px;
+    padding:6px 0 6px 8px;
+    white-space:nowrap;
+    flex-shrink:0;
+    user-select:none;
+    display:flex;
+    align-items:center;
+    line-height:1.5;
+  }
+  .msg-desc-input{
+    flex:1;
+    background:transparent;
+    border:none;
+    color:var(--vscode-input-foreground);
+    font-family:var(--vscode-font-family);
+    font-size:12px;
+    padding:6px 8px;
+    outline:none;
+    min-width:0;
+    line-height:1.5;
+  }
+
   .char-counter{
     text-align:right;
     font-size:10px;
@@ -279,8 +314,6 @@ function getWebviewContent(files: ChangedFile[]): string {
   .char-counter.over{color:var(--vscode-errorForeground);font-weight:600}
 
   .regen-btn{
-    position:absolute;
-    top:5px;right:5px;
     font-size:10px;
     background:transparent;
     border:1px solid var(--vscode-button-secondaryBorder, var(--vscode-input-border));
@@ -290,7 +323,10 @@ function getWebviewContent(files: ChangedFile[]): string {
     cursor:pointer;
     font-family:var(--vscode-font-family);
     transition:background 0.1s;
+    flex-shrink:0;
   }
+  .msg-wrap .regen-btn{position:absolute;top:5px;right:5px}
+  .msg-input-row .regen-btn{margin:4px 5px 4px 0}
   .regen-btn:hover{background:var(--vscode-toolbar-hoverBackground);color:var(--vscode-foreground)}
 
   .scope-bar{
@@ -515,6 +551,7 @@ let selectedPaths = new Set(files.map(f => f.filepath));
 let commitType = inferDominantType(files);
 let userEditedMsg = false;
 let showBody = false;
+let userEditedBody = false;
 let showFiles = true;
 let commitBody = '';
 let breakingChange = false;
@@ -761,7 +798,7 @@ function render() {
     '</div>'+
     '<div class="scope-bar">'+
       '<span class="scope-label">SCOPE</span>'+
-      '<input class="scope-input" type="text" placeholder="override scope..." maxlength="20"'+
+      '<input class="scope-input" type="text" placeholder="specify scope (optional)" maxlength="20"'+
         'value="'+esc(customScope)+'" oninput="onScopeEdit(this.value)"/>'+
       (customScope ? '<button class="scope-clear" onclick="clearScope()" title="Clear scope">×</button>' : '')+
     '</div>'+
@@ -781,10 +818,21 @@ function render() {
     (showFiles ? '<div class="file-list">'+rows+'</div>' : '')+
     '<div class="msg-section">'+
       '<div class="section-label">Commit Message</div>'+
-      '<div class="msg-wrap">'+
-        '<textarea class="msg-edit" rows="2" id="msgEdit" oninput="onMsgEdit(this.value)">'+esc(commitMsg)+'</textarea>'+
-        '<button class="regen-btn" onclick="regenMsg()">↺ regen</button>'+
-      '</div>'+
+      (commitType !== 'none' ? (()=>{
+        const colonIdx = commitMsg.indexOf(': ');
+        const msgPrefix = colonIdx >= 0 ? commitMsg.slice(0, colonIdx + 1) : commitMsg;
+        const msgDesc   = colonIdx >= 0 ? commitMsg.slice(colonIdx + 2) : '';
+        return '<div class="msg-input-row" id="msgInputRow">'+
+          '<span class="msg-prefix" id="msgPrefix">'+esc(msgPrefix)+'</span>'+
+          '<input class="msg-desc-input" id="msgDesc" type="text" value="'+esc(msgDesc)+'" oninput="onDescEdit(this.value)"/>'+
+          (userEditedMsg ? '<button class="regen-btn" onclick="regenMsg()">↺ regen</button>' : '')+
+        '</div>';
+      })() :
+        '<div class="msg-input-row" id="msgInputRow">'+
+          '<input class="msg-desc-input" id="msgEdit" type="text" value="'+esc(commitMsg)+'" oninput="onMsgEdit(this.value)"/>'+
+          '<button class="regen-btn" onclick="regenMsg()">↺ regen</button>'+
+        '</div>'
+      )+
       '<div class="char-counter '+(commitMsg.length > 72 ? 'over' : '')+'" id="charCounter">'+
         commitMsg.length+' / 72'+
       '</div>'+
@@ -806,27 +854,67 @@ function render() {
 }
 
 function setType(t) {
+  const prevType = commitType;
   commitType = t;
-  if (!userEditedMsg) {
+
+  if (t === 'none') {
+    if (userEditedMsg) {
+      // Strip the conventional prefix — keep only the description
+      const colonIdx = commitMsg.indexOf(': ');
+      if (colonIdx >= 0) commitMsg = commitMsg.slice(colonIdx + 2);
+    } else {
+      // No custom edit — regenerate as plain message
+      commitMsg = buildMsg(files.filter(f => selectedPaths.has(f.filepath)), commitType);
+    }
+  } else if (prevType === 'none' && userEditedMsg) {
+    // Carry the none message as the description under the new prefix
+    const newMsg = buildMsg(files.filter(f => selectedPaths.has(f.filepath)), commitType);
+    const newColonIdx = newMsg.indexOf(': ');
+    const newPrefix = newColonIdx >= 0 ? newMsg.slice(0, newColonIdx + 2) : '';
+    commitMsg = newPrefix + commitMsg;
+  } else if (prevType === 'none' && !userEditedMsg) {
+    // No custom edit — regenerate fully
     commitMsg = buildMsg(files.filter(f => selectedPaths.has(f.filepath)), commitType);
+  } else {
+    // Switching between conventional types — keep user's description, update prefix only
+    const colonIdx = commitMsg.indexOf(': ');
+    const currentDesc = userEditedMsg && colonIdx >= 0 ? commitMsg.slice(colonIdx + 2) : null;
+    commitMsg = buildMsg(files.filter(f => selectedPaths.has(f.filepath)), commitType);
+    if (currentDesc !== null) {
+      const newColonIdx = commitMsg.indexOf(': ');
+      const newPrefix = newColonIdx >= 0 ? commitMsg.slice(0, newColonIdx + 2) : '';
+      commitMsg = newPrefix + currentDesc;
+    }
   }
-  if (showBody) commitBody = buildBody(files.filter(f => selectedPaths.has(f.filepath)));
+
+  if (showBody && !userEditedBody) {
+    commitBody = buildBody(files.filter(f => selectedPaths.has(f.filepath)));
+  }
   render();
 }
 
 function toggleFile(fp) {
   if (selectedPaths.has(fp)) selectedPaths.delete(fp);
   else selectedPaths.add(fp);
-  if (!userEditedMsg) {
+  if (commitType !== 'none') {
+    const colonIdx = commitMsg.indexOf(': ');
+    const currentDesc = userEditedMsg && colonIdx >= 0 ? commitMsg.slice(colonIdx + 2) : null;
+    commitMsg = buildMsg(files.filter(f => selectedPaths.has(f.filepath)), commitType);
+    if (currentDesc !== null) {
+      const newColonIdx = commitMsg.indexOf(': ');
+      const newPrefix = newColonIdx >= 0 ? commitMsg.slice(0, newColonIdx + 2) : '';
+      commitMsg = newPrefix + currentDesc;
+    }
+  } else if (!userEditedMsg) {
     commitMsg = buildMsg(files.filter(f => selectedPaths.has(f.filepath)), commitType);
   }
-  if (showBody) commitBody = buildBody(files.filter(f => selectedPaths.has(f.filepath)));
+  if (showBody && !userEditedBody) commitBody = buildBody(files.filter(f => selectedPaths.has(f.filepath)));
   render();
 }
 
 function selectAll() {
   selectedPaths = new Set(files.map(f=>f.filepath));
-  if (showBody) commitBody = buildBody(files.filter(f => selectedPaths.has(f.filepath)));
+  if (showBody && !userEditedBody) commitBody = buildBody(files.filter(f => selectedPaths.has(f.filepath)));
   regenMsg();
 }
 function selectNone() {
@@ -834,6 +922,8 @@ function selectNone() {
   commitMsg='';
   commitBody='';
   customScope='';
+  userEditedMsg = false;
+  userEditedBody = false;
   render();
 }
 
@@ -843,7 +933,21 @@ function regenMsg() {
   render();
 }
 
+function onDescEdit(val) {
+  userEditedMsg = true;
+  const colonIdx = commitMsg.indexOf(': ');
+  const prefix = colonIdx >= 0 ? commitMsg.slice(0, colonIdx + 2) : '';
+  commitMsg = prefix + val;
+  const counter = document.getElementById('charCounter');
+  if (counter) {
+    counter.textContent = commitMsg.length + ' / 72';
+    counter.className = 'char-counter' + (commitMsg.length > 72 ? ' over' : '');
+  }
+  refreshCmd();
+}
+
 function onMsgEdit(val) {
+  if (commitType !== 'none') return;
   userEditedMsg = true;
   commitMsg = val;
   const counter = document.getElementById('charCounter');
@@ -880,10 +984,20 @@ window.addEventListener('message', e => {
       if (!files.find(x => x.filepath === f.filepath)) selectedPaths.add(f.filepath);
     });
     files = e.data.files;
-    if (!userEditedMsg) {
+    if (commitType !== 'none') {
+      // Always rebuild prefix (scope/type may change), but keep user's description
+      const colonIdx = commitMsg.indexOf(': ');
+      const currentDesc = userEditedMsg && colonIdx >= 0 ? commitMsg.slice(colonIdx + 2) : null;
+      commitMsg = buildMsg(files.filter(f => selectedPaths.has(f.filepath)), commitType);
+      if (currentDesc !== null) {
+        const newColonIdx = commitMsg.indexOf(': ');
+        const newPrefix = newColonIdx >= 0 ? commitMsg.slice(0, newColonIdx + 2) : '';
+        commitMsg = newPrefix + currentDesc;
+      }
+    } else if (!userEditedMsg) {
       commitMsg = buildMsg(files.filter(f => selectedPaths.has(f.filepath)), commitType);
     }
-    if (showBody) commitBody = buildBody(files.filter(f => selectedPaths.has(f.filepath)));
+    if (showBody && !userEditedBody) commitBody = buildBody(files.filter(f => selectedPaths.has(f.filepath)));
     render();
   }
 });
@@ -897,17 +1011,23 @@ function toggleBody() {
   showBody = !showBody;
   if (showBody && !commitBody) {
     commitBody = buildBody(files.filter(f => selectedPaths.has(f.filepath)));
+    userEditedBody = false;
   }
-  if (!showBody) commitBody = '';  // ← add this line
+  if (!showBody) {
+    commitBody = '';
+    userEditedBody = false;
+  }
   render();
 }
 
 function regenBody() {
+  userEditedBody = false;
   commitBody = buildBody(files.filter(f => selectedPaths.has(f.filepath)));
   render();
 }
 
 function onBodyEdit(val) {
+  userEditedBody = true;
   commitBody = val;
   const counter = document.getElementById('bodyCounter');
   if (counter) {
@@ -980,14 +1100,37 @@ function updateFooterValue(idx, val) {
 
 function onScopeEdit(val) {
   customScope = val;
-  if (!userEditedMsg) {
+  if (commitType !== 'none') {
+    // Keep user's description if they edited it, only rebuild prefix
+    const colonIdx = commitMsg.indexOf(': ');
+    const currentDesc = userEditedMsg && colonIdx >= 0 ? commitMsg.slice(colonIdx + 2) : null;
     commitMsg = buildMsg(files.filter(f => selectedPaths.has(f.filepath)), commitType);
-    const msgEl = document.getElementById('msgEdit');
-    if (msgEl) msgEl.value = commitMsg;
+    if (currentDesc !== null) {
+      const newColonIdx = commitMsg.indexOf(': ');
+      const newPrefix = newColonIdx >= 0 ? commitMsg.slice(0, newColonIdx + 2) : '';
+      commitMsg = newPrefix + currentDesc;
+    }
+    // Update prefix span without losing focus on desc input
+    const prefixEl = document.getElementById('msgPrefix');
+    if (prefixEl) {
+      const ci = commitMsg.indexOf(': ');
+      prefixEl.textContent = ci >= 0 ? commitMsg.slice(0, ci + 1) : commitMsg;
+    }
     const counter = document.getElementById('charCounter');
     if (counter) {
       counter.textContent = commitMsg.length + ' / 72';
       counter.className = 'char-counter' + (commitMsg.length > 72 ? ' over' : '');
+    }
+  } else {
+    if (!userEditedMsg) {
+      commitMsg = buildMsg(files.filter(f => selectedPaths.has(f.filepath)), commitType);
+      const msgEl = document.getElementById('msgEdit');
+      if (msgEl) msgEl.value = commitMsg;
+      const counter = document.getElementById('charCounter');
+      if (counter) {
+        counter.textContent = commitMsg.length + ' / 72';
+        counter.className = 'char-counter' + (commitMsg.length > 72 ? ' over' : '');
+      }
     }
   }
   refreshCmd();

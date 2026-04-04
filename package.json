@@ -1,7 +1,7 @@
 {
   "name": "gimmit",
   "displayName": "gimmit",
-  "description": "Select modified files and generate conventional commit commands — live updating sidebar.",
+  "description": "Generate conventional commit commands from your changed files.",
   "version": "0.1.0",
   "engines": { "vscode": "^1.85.0" },
   "categories": ["Other"],
@@ -11,7 +11,7 @@
     "commands": [
       {
         "command": "gimmit.open",
-        "title": "gimmit: Open Sidebar"
+        "title": "gimmit: Open"
       }
     ],
     "views": {
@@ -34,5 +34,21 @@
     "@types/node": "^20.0.0",
     "@types/vscode": "^1.85.0",
     "typescript": "^5.3.0"
-  }
+  },
+  "publisher": "your-publisher-id",
+  "icon": "media/icon.png",
+  "galleryBanner": {
+    "color": "#0d0f14",
+    "theme": "dark"
+  },
+  "keywords": ["git", "commit", "conventional commits", "scm"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Austin-FV/gimmit"
+  },
+  "bugs": {
+    "url": "https://github.com/Austin-FV/gimmit/issues"
+  },
+  "homepage": "https://github.com/Austin-FV/gimmit#readme",
+  "license": "MIT"
 }

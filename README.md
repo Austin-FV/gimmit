@@ -1,4 +1,4 @@
-# Gimmit - Git Commit Helper
+# gimmit - Git Commit Helper
 
 A VS Code extension that reads your modified files, lets you pick which ones to commit, auto-detects the change type, and generates a ready-to-paste conventional commit command.
 

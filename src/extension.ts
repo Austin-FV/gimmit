@@ -623,7 +623,7 @@ function buildCmd(selected, msg, body, breaking, brkMsg, footers) {
   const paths = selected.map(f => f.filepath).join(' ');
   const safe = msg.replace(/"/g, String.fromCharCode(92) + '"');
   const NL = String.fromCharCode(10);
-  let cmd = 'git add ' + paths + NL + NL + 'git commit -m "' + safe + '"';
+  let cmd = 'git add ' + paths + NL + 'git commit -m "' + safe + '"';
   if (body && body.trim()) {
     const safeBody = body.replace(/"/g, String.fromCharCode(92) + '"');
     cmd += ' -m "' + safeBody + '"';

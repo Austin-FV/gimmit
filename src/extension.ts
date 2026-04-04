@@ -266,6 +266,15 @@ function getWebviewContent(files: ChangedFile[]): string {
   }
   .msg-edit:focus{border-color:var(--vscode-focusBorder)}
 
+  .char-counter{
+    text-align:right;
+    font-size:10px;
+    color:var(--vscode-descriptionForeground);
+    margin-top:3px;
+    transition:color 0.1s;
+  }
+  .char-counter.over{color:var(--vscode-errorForeground);font-weight:600}
+
   .regen-btn{
     position:absolute;
     top:5px;right:5px;
@@ -361,12 +370,31 @@ function getWebviewContent(files: ChangedFile[]): string {
     color:var(--vscode-input-foreground);
     font-family:var(--vscode-font-family);
     font-size:11px;
-    padding:4px 6px;
+    padding:4px 38px 4px 6px;
     outline:none;
-    flex:1;
-    min-width:0;
+    width:100%;
   }
   .footer-value-input:focus{border-color:var(--vscode-focusBorder)}
+  .footer-value-wrap{position:relative;flex:1;min-width:0}
+  .footer-val-counter{
+    position:absolute;
+    right:5px;top:50%;
+    transform:translateY(-50%);
+    font-size:9px;
+    color:var(--vscode-descriptionForeground);
+    opacity:0.5;
+    pointer-events:none;
+  }
+  .footer-val-counter.over{color:var(--vscode-errorForeground);opacity:1;font-weight:600}
+
+  .body-counter{
+    text-align:right;
+    font-size:10px;
+    color:var(--vscode-descriptionForeground);
+    margin-top:3px;
+    transition:color 0.1s;
+  }
+  .body-counter.over{color:var(--vscode-errorForeground);font-weight:600}
   .footer-remove{
     background:transparent;
     border:none;
@@ -459,7 +487,9 @@ const TYPE_META = {
   style:    '#f472b6',
   test:     '#facc15',
   perf:     '#38bdf8',
-  plain:    '#94a3b8',
+  build:    '#e879f9',
+  ci:       '#f59e0b',
+  none:     '#94a3b8',
 };
 const ALL_TYPES = Object.keys(TYPE_META);
 
@@ -468,6 +498,7 @@ let selectedPaths = new Set(files.map(f => f.filepath));
 let commitType = inferDominantType(files);
 let userEditedMsg = false;
 let showBody = false;
+let showFiles = true;
 let commitBody = '';
 let breakingChange = false;
 let breakingMsg = '';
@@ -485,8 +516,8 @@ function inferDominantType(fs) {
 function buildMsg(selected, type) {
   if (!selected.length) return '';
 
-  // Plain mode — no conventional commits prefix
-  if (type === 'plain') {
+  // None mode — no conventional commits prefix
+  if (type === 'none') {
     const names = selected.map(f => f.filepath.split('/').pop().replace(/\.[^.]+$/, ''));
     if (names.length === 1) return 'update ' + names[0];
     if (names.length <= 3)  return 'update ' + names.join(', ');
@@ -499,22 +530,26 @@ function buildMsg(selected, type) {
   let desc;
   if (names.length === 1) {
     const n = names[0];
-    if (type==='fix')      desc='fix issue in '+n;
+    if (type==='fix')           desc='fix issue in '+n;
     else if (type==='docs')     desc='update '+n+' documentation';
     else if (type==='test')     desc='add tests for '+n;
     else if (type==='chore')    desc='update '+n+' config';
     else if (type==='style')    desc='update '+n+' styles';
     else if (type==='refactor') desc='refactor '+n;
-    else if (type==='perf') desc='improve performance of '+n;
+    else if (type==='perf')     desc='improve performance of '+n;
+    else if (type==='build')    desc='update '+n+' build config';
+    else if (type==='ci')       desc='update '+n+' CI config';
     else                        desc='add '+n;
   } else {
-    if (type==='fix')      desc='fix issues across '+names.length+' files';
+    if (type==='fix')           desc='fix issues across '+names.length+' files';
     else if (type==='docs')     desc='update documentation';
     else if (type==='test')     desc='add/update tests';
     else if (type==='chore')    desc='update config files';
     else if (type==='style')    desc='update styles';
     else if (type==='refactor') desc='refactor '+names.length+' files';
-    else if (type==='perf') desc='improve performance across '+names.length+' files';
+    else if (type==='perf')     desc='improve performance across '+names.length+' files';
+    else if (type==='build')    desc='update build configuration';
+    else if (type==='ci')       desc='update CI configuration';
     else                        desc='update '+names.length+' files';
   }
   const prefix = type + (scope ? '('+scope+')' : '');
@@ -629,10 +664,41 @@ function render() {
         '<span class="section-label">Commit Body</span>'+
         '<button class="toggle-btn" onclick="toggleBody()">'+(showBody ? '▾ hide' : '▸ add body')+'</button>'+
       '</div>'+
-      (showBody ?
-        '<div class="msg-wrap">'+
+      (showBody ? (()=>{
+        const longest = commitBody.split(String.fromCharCode(10)).reduce((max,l)=>Math.max(max,l.length),0);
+        return '<div class="msg-wrap">'+
           '<textarea class="msg-edit" rows="4" id="bodyEdit" oninput="onBodyEdit(this.value)">'+esc(commitBody)+'</textarea>'+
           '<button class="regen-btn" onclick="regenBody()">↺ regen</button>'+
+        '</div>'+
+        '<div class="body-counter '+(longest>72?'over':'')+'" id="bodyCounter">longest line: '+longest+' / 72</div>';
+      })() : '')+
+    '</div>';
+
+  const MAX_FOOTER_VAL = 100;
+  const footerRows = footers.map((f, i) => {
+    const tokenOpts = FOOTER_TOKENS.map(t =>
+      '<option value="'+t+'"'+(f.token===t?' selected':'')+'>'+t+'</option>'
+    ).join('');
+    return '<div class="footer-row">'+
+      '<select class="footer-select" data-idx="'+i+'" onchange="updateFooterToken(+this.dataset.idx,this.value)">'+tokenOpts+'</select>'+
+      (f.token === 'Custom' ?
+        '<input class="footer-token-input" placeholder="token" value="'+esc(f.customToken)+'" data-idx="'+i+'" oninput="updateFooterCustomToken(+this.dataset.idx,this.value)"/>'
+      : '')+
+      '<div class="footer-value-wrap">'+
+        '<input class="footer-value-input" placeholder="value" maxlength="'+MAX_FOOTER_VAL+'" value="'+esc(f.value)+'" data-idx="'+i+'" oninput="updateFooterValue(+this.dataset.idx,this.value)"/>'+
+        '<span class="footer-val-counter '+(f.value.length>90?'over':'')+'" id="fvc'+i+'">'+f.value.length+'/'+MAX_FOOTER_VAL+'</span>'+
+      '</div>'+
+      '<button class="footer-remove" data-idx="'+i+'" onclick="removeFooter(+this.dataset.idx)" title="Remove">×</button>'+
+    '</div>';
+  }).join('');
+    '<div class="msg-section">'+
+      '<div class="section-label-row">'+
+        '<span class="section-label" style="color:var(--vscode-errorForeground)">⚠ Breaking Change</span>'+
+        '<button class="toggle-btn" onclick="toggleBreaking()">'+(breakingChange ? '▾ remove' : '▸ add')+'</button>'+
+      '</div>'+
+      (breakingChange ?
+        '<div class="msg-wrap">'+
+          '<textarea class="msg-edit" rows="2" id="breakingEdit" placeholder="describe what breaks and how to migrate..." oninput="onBreakingEdit(this.value)">'+esc(breakingMsg)+'</textarea>'+
         '</div>'
       : '')+
     '</div>';
@@ -650,20 +716,7 @@ function render() {
       : '')+
     '</div>';
 
-  const footerRows = footers.map((f, i) => {
-    const tokenOpts = FOOTER_TOKENS.map(t =>
-      '<option value="'+t+'"'+(f.token===t?' selected':'')+'>'+t+'</option>'
-    ).join('');
-    return '<div class="footer-row">'+
-      '<select class="footer-select" data-idx="'+i+'" onchange="updateFooterToken(+this.dataset.idx,this.value)">'+tokenOpts+'</select>'+
-      (f.token === 'Custom' ?
-        '<input class="footer-token-input" placeholder="token" value="'+esc(f.customToken)+'" data-idx="'+i+'" oninput="updateFooterCustomToken(+this.dataset.idx,this.value)"/>'
-      : '')+
-      '<input class="footer-value-input" placeholder="value" value="'+esc(f.value)+'" data-idx="'+i+'" oninput="updateFooterValue(+this.dataset.idx,this.value)"/>'+
-      '<button class="footer-remove" data-idx="'+i+'" onclick="removeFooter(+this.dataset.idx)" title="Remove">×</button>'+
-    '</div>';
-  }).join('');
-
+  const MAX_FOOTERS = 8;
   const footerSection =
   '<div class="msg-section">'+
     '<div class="section-label-row">'+
@@ -672,7 +725,11 @@ function render() {
         (footers.length ?
           '<button class="toggle-btn" style="color:var(--vscode-descriptionForeground)" onclick="clearFooters()">clear all</button>'
         : '')+
-        '<button class="toggle-btn" onclick="addFooter()">▸ add footer</button>'+
+        (footers.length < MAX_FOOTERS ?
+          '<button class="toggle-btn" onclick="addFooter()">▸ add footer</button>'
+        :
+          '<span style="font-size:10px;color:var(--vscode-descriptionForeground);opacity:0.6">max '+MAX_FOOTERS+'</span>'
+        )+
       '</div>'+
     '</div>'+
     footerRows+
@@ -685,20 +742,32 @@ function render() {
     '</div>'+
     '<div class="scope-bar">'+
       '<span class="scope-label">SCOPE</span>'+
-      '<input class="scope-input" type="text" placeholder="override scope..." '+
+      '<input class="scope-input" type="text" placeholder="override scope..." maxlength="20"'+
         'value="'+esc(customScope)+'" oninput="onScopeEdit(this.value)"/>'+
       (customScope ? '<button class="scope-clear" onclick="clearScope()" title="Clear scope">×</button>' : '')+
     '</div>'+
     '<div class="list-header">'+
-      '<span class="list-label">Changed Files</span>'+
-      '<div class="quick-links"><a onclick="selectAll()">all</a><a onclick="selectNone()">none</a></div>'+
+      '<div style="display:flex;align-items:center;gap:4px;cursor:pointer" onclick="toggleFiles()">'+
+        '<span style="font-size:10px;color:var(--vscode-descriptionForeground)">'+(showFiles?'▾':'▸')+'</span>'+
+        '<span class="list-label">Changed Files ('+files.length+')</span>'+
+        (!showFiles ? '<span style="font-size:10px;color:var(--vscode-descriptionForeground);opacity:0.7">&nbsp;'+selected.length+'/'+files.length+' selected</span>' : '')+
+      '</div>'+
+      (showFiles ?
+        '<div class="quick-links">'+
+          '<a onclick="event.stopPropagation();selectAll()">all</a>'+
+          '<a onclick="event.stopPropagation();selectNone()">none</a>'+
+        '</div>'
+      : '')+
     '</div>'+
-    '<div class="file-list">'+rows+'</div>'+
+    (showFiles ? '<div class="file-list">'+rows+'</div>' : '')+
     '<div class="msg-section">'+
       '<div class="section-label">Commit Message</div>'+
       '<div class="msg-wrap">'+
         '<textarea class="msg-edit" rows="2" id="msgEdit" oninput="onMsgEdit(this.value)">'+esc(commitMsg)+'</textarea>'+
         '<button class="regen-btn" onclick="regenMsg()">↺ regen</button>'+
+      '</div>'+
+      '<div class="char-counter '+(commitMsg.length > 72 ? 'over' : '')+'" id="charCounter">'+
+        commitMsg.length+' / 72'+
       '</div>'+
     '</div>'+
     bodySection+
@@ -753,6 +822,11 @@ function regenMsg() {
 function onMsgEdit(val) {
   userEditedMsg = true;
   commitMsg = val;
+  const counter = document.getElementById('charCounter');
+  if (counter) {
+    counter.textContent = val.length + ' / 72';
+    counter.className = 'char-counter' + (val.length > 72 ? ' over' : '');
+  }
   const sel = files.filter(f => selectedPaths.has(f.filepath));
   const cmd = buildCmd(sel, val, showBody ? commitBody : '', breakingChange, breakingMsg, footers);
   const box = document.getElementById('cmdBox');
@@ -791,6 +865,11 @@ window.addEventListener('message', e => {
   }
 });
 
+function toggleFiles() {
+  showFiles = !showFiles;
+  render();
+}
+
 function toggleBody() {
   showBody = !showBody;
   if (showBody && !commitBody) {
@@ -807,6 +886,12 @@ function regenBody() {
 
 function onBodyEdit(val) {
   commitBody = val;
+  const counter = document.getElementById('bodyCounter');
+  if (counter) {
+    const longest = val.split(String.fromCharCode(10)).reduce((max,l)=>Math.max(max,l.length),0);
+    counter.textContent = 'longest line: ' + longest + ' / 72';
+    counter.className = 'body-counter' + (longest > 72 ? ' over' : '');
+  }
   const sel = files.filter(f => selectedPaths.has(f.filepath));
   const cmd = buildCmd(sel, commitMsg, val, breakingChange, breakingMsg, footers);
   const box = document.getElementById('cmdBox');
@@ -864,6 +949,11 @@ function updateFooterCustomToken(idx, val) {
 
 function updateFooterValue(idx, val) {
   footers[idx].value = val;
+  const counter = document.getElementById('fvc'+idx);
+  if (counter) {
+    counter.textContent = val.length+'/100';
+    counter.className = 'footer-val-counter'+(val.length>90?' over':'');
+  }
   refreshCmd();
 }
 
@@ -871,6 +961,13 @@ function onScopeEdit(val) {
   customScope = val;
   if (!userEditedMsg) {
     commitMsg = buildMsg(files.filter(f => selectedPaths.has(f.filepath)), commitType);
+    const msgEl = document.getElementById('msgEdit');
+    if (msgEl) msgEl.value = commitMsg;
+    const counter = document.getElementById('charCounter');
+    if (counter) {
+      counter.textContent = commitMsg.length + ' / 72';
+      counter.className = 'char-counter' + (commitMsg.length > 72 ? ' over' : '');
+    }
   }
   refreshCmd();
 }

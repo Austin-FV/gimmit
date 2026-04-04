@@ -281,6 +281,47 @@ function getWebviewContent(files: ChangedFile[]): string {
   }
   .regen-btn:hover{background:var(--vscode-toolbar-hoverBackground);color:var(--vscode-foreground)}
 
+  .scope-bar{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    margin-bottom:10px;
+    background:var(--vscode-input-background);
+    border:1px solid var(--vscode-input-border, transparent);
+    border-radius:4px;
+    padding:5px 8px;
+  }
+  .scope-label{
+    font-size:10px;
+    color:var(--vscode-descriptionForeground);
+    font-weight:600;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    white-space:nowrap;
+  }
+  .scope-input{
+    flex:1;
+    background:transparent;
+    border:none;
+    color:var(--vscode-input-foreground);
+    font-family:var(--vscode-font-family);
+    font-size:11px;
+    outline:none;
+  }
+  .scope-input::placeholder{color:var(--vscode-input-placeholderForeground)}
+  .scope-clear{
+    background:transparent;
+    border:none;
+    color:var(--vscode-descriptionForeground);
+    cursor:pointer;
+    font-size:14px;
+    padding:0 2px;
+    opacity:0.6;
+    line-height:1;
+    flex-shrink:0;
+  }
+  .scope-clear:hover{color:var(--vscode-errorForeground);opacity:1}
+
   .footer-row{
     display:flex;
     align-items:center;
@@ -397,18 +438,6 @@ function getWebviewContent(files: ChangedFile[]): string {
     line-height:1.8;
   }
 
-  .live-badge{
-    font-size:10px;
-    color:var(--vscode-terminal-ansiGreen, #4ade80);
-    opacity:0.8;
-  }
-  .pulse{
-    display:inline-block;width:5px;height:5px;border-radius:50%;
-    background:var(--vscode-terminal-ansiGreen, #4ade80);
-    margin-right:3px;vertical-align:middle;
-    animation:pulse 2s ease-in-out infinite;
-  }
-  @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
 </style>
 </head>
 <body>
@@ -429,6 +458,7 @@ const TYPE_META = {
   refactor: '#fb923c',
   style:    '#f472b6',
   test:     '#facc15',
+  perf:     '#38bdf8',
   plain:    '#94a3b8',
 };
 const ALL_TYPES = Object.keys(TYPE_META);
@@ -442,6 +472,7 @@ let commitBody = '';
 let breakingChange = false;
 let breakingMsg = '';
 let footers = []; // [{id, token, customToken, value}]
+let customScope = '';
 let commitMsg  = buildMsg(files.filter(f => selectedPaths.has(f.filepath)), commitType);
 
 function inferDominantType(fs) {
@@ -463,7 +494,7 @@ function buildMsg(selected, type) {
   }
 
   const dirs = [...new Set(selected.map(f => { const p=f.filepath.split('/'); return p.length>1?p[0]:''; }).filter(Boolean))];
-  const scope = dirs.length === 1 ? dirs[0] : '';
+  const scope = customScope || (dirs.length === 1 ? dirs[0] : '');
   const names = selected.map(f => f.filepath.split('/').pop().replace(/\.[^.]+$/, ''));
   let desc;
   if (names.length === 1) {
@@ -474,6 +505,7 @@ function buildMsg(selected, type) {
     else if (type==='chore')    desc='update '+n+' config';
     else if (type==='style')    desc='update '+n+' styles';
     else if (type==='refactor') desc='refactor '+n;
+    else if (type==='perf') desc='improve performance of '+n;
     else                        desc='add '+n;
   } else {
     if (type==='fix')      desc='fix issues across '+names.length+' files';
@@ -482,6 +514,7 @@ function buildMsg(selected, type) {
     else if (type==='chore')    desc='update config files';
     else if (type==='style')    desc='update styles';
     else if (type==='refactor') desc='refactor '+names.length+' files';
+    else if (type==='perf') desc='improve performance across '+names.length+' files';
     else                        desc='update '+names.length+' files';
   }
   const prefix = type + (scope ? '('+scope+')' : '');
@@ -649,7 +682,12 @@ function render() {
     '<div class="type-bar">'+
       '<label>TYPE</label>'+
       '<div class="type-chips">'+chips+'</div>'+
-      '<span class="live-badge"><span class="pulse"></span>LIVE</span>'+
+    '</div>'+
+    '<div class="scope-bar">'+
+      '<span class="scope-label">SCOPE</span>'+
+      '<input class="scope-input" type="text" placeholder="override scope..." '+
+        'value="'+esc(customScope)+'" oninput="onScopeEdit(this.value)"/>'+
+      (customScope ? '<button class="scope-clear" onclick="clearScope()" title="Clear scope">×</button>' : '')+
     '</div>'+
     '<div class="list-header">'+
       '<span class="list-label">Changed Files</span>'+
@@ -702,6 +740,7 @@ function selectNone() {
   selectedPaths = new Set();
   commitMsg='';
   commitBody='';
+  customScope='';
   render();
 }
 
@@ -826,6 +865,22 @@ function updateFooterCustomToken(idx, val) {
 function updateFooterValue(idx, val) {
   footers[idx].value = val;
   refreshCmd();
+}
+
+function onScopeEdit(val) {
+  customScope = val;
+  if (!userEditedMsg) {
+    commitMsg = buildMsg(files.filter(f => selectedPaths.has(f.filepath)), commitType);
+  }
+  refreshCmd();
+}
+
+function clearScope() {
+  customScope = '';
+  if (!userEditedMsg) {
+    commitMsg = buildMsg(files.filter(f => selectedPaths.has(f.filepath)), commitType);
+  }
+  render();
 }
 
 function refreshCmd() {

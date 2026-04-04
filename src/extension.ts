@@ -430,8 +430,9 @@ function getWebviewContent(files: ChangedFile[]): string {
     font-size:11px;
     font-family:var(--vscode-editor-font-family);
     line-height:2;
-    white-space:pre;
-    overflow-x:auto;
+    white-space:pre-wrap; /* was pre — this enables wrapping */
+    word-break:break-all;
+    overflow-x:hidden; /* no more horizontal scroll */
   }
   .cmd-line{display:block}
   .ck{color:var(--vscode-symbolIcon-keywordForeground, #569cd6)}
@@ -440,19 +441,19 @@ function getWebviewContent(files: ChangedFile[]): string {
   .cp{color:var(--vscode-foreground)}
 
   .copy-btn{
-    position:absolute;
-    top:6px;right:6px;
-    font-size:10px;
-    background:var(--vscode-button-secondaryBackground, transparent);
+    font-size:11px;
+    font-family:var(--vscode-font-family);
+    font-weight:600;
+    letter-spacing:0.04em;
+    background:var(--vscode-button-secondaryBackground, var(--vscode-input-background));
     border:1px solid var(--vscode-button-secondaryBorder, var(--vscode-input-border));
     border-radius:3px;
     color:var(--vscode-button-secondaryForeground, var(--vscode-foreground));
-    padding:2px 8px;
+    padding:3px 10px;
     cursor:pointer;
-    font-family:var(--vscode-font-family);
-    transition:background 0.1s;
+    transition:background 0.1s, color 0.15s, border-color 0.15s;
   }
-  .copy-btn:hover{background:var(--vscode-button-secondaryHoverBackground)}
+  .copy-btn:hover{background:var(--vscode-button-secondaryHoverBackground);color:var(--vscode-foreground)}
   .copy-btn.ok{
     color:var(--vscode-terminal-ansiGreen, #4ade80);
     border-color:var(--vscode-terminal-ansiGreen, #4ade80);
@@ -774,9 +775,12 @@ function render() {
     footerSection+
     breakingSection+
     '<div class="cmd-section">'+
-      '<div class="section-label">Git Command</div>'+
+      '<div class="section-label-row">'+
+        '<span class="section-label">Git Command</span>'+
+        '<button class="copy-btn" id="copyBtn" onclick="copyCmd()">Copy</button>'+
+      '</div>'+
       '<div class="cmd-box" id="cmdBox">'+
-        '<button class="copy-btn" id="copyBtn" onclick="copyCmd()">COPY</button>'+cmdHtml+
+        cmdHtml+
       '</div>'+
     '</div>';
 }
@@ -831,8 +835,7 @@ function onMsgEdit(val) {
   const cmd = buildCmd(sel, val, showBody ? commitBody : '', breakingChange, breakingMsg, footers);
   const box = document.getElementById('cmdBox');
   if (box) {
-    box.innerHTML = '<button class="copy-btn" id="copyBtn" onclick="copyCmd()">COPY</button>'+
-      (cmd ? highlightCmd(cmd) : '<span class="cp" style="opacity:0.4">select files above</span>');
+    box.innerHTML = (cmd ? highlightCmd(cmd) : '<span class="cp" style="opacity:0.4">select files above</span>');
   }
 }
 
@@ -843,8 +846,8 @@ function copyCmd() {
   navigator.clipboard.writeText(cmd).then(() => {
     const btn = document.getElementById('copyBtn');
     if (btn) {
-      btn.textContent='COPIED!'; btn.classList.add('ok');
-      setTimeout(()=>{ btn.textContent='COPY'; btn.classList.remove('ok'); }, 1800);
+      btn.textContent='Copied!'; btn.classList.add('ok');
+      setTimeout(()=>{ btn.textContent='Copy'; btn.classList.remove('ok'); }, 1800);
     }
   });
 }
@@ -896,8 +899,7 @@ function onBodyEdit(val) {
   const cmd = buildCmd(sel, commitMsg, val, breakingChange, breakingMsg, footers);
   const box = document.getElementById('cmdBox');
   if (box) {
-    box.innerHTML = '<button class="copy-btn" id="copyBtn" onclick="copyCmd()">COPY</button>'+
-      (cmd ? highlightCmd(cmd) : '<span class="cp" style="opacity:0.4">select files above</span>');
+    box.innerHTML = (cmd ? highlightCmd(cmd) : '<span class="cp" style="opacity:0.4">select files above</span>');
   }
 }
 
@@ -916,8 +918,7 @@ function onBreakingEdit(val) {
   const cmd = buildCmd(sel, commitMsg, showBody ? commitBody : '', true, val, footers);
   const box = document.getElementById('cmdBox');
   if (box) {
-    box.innerHTML = '<button class="copy-btn" id="copyBtn" onclick="copyCmd()">COPY</button>'+
-      (cmd ? highlightCmd(cmd) : '<span class="cp" style="opacity:0.4">select files above</span>');
+    box.innerHTML = (cmd ? highlightCmd(cmd) : '<span class="cp" style="opacity:0.4">select files above</span>');
   }
 }
 
@@ -985,8 +986,7 @@ function refreshCmd() {
   const cmd = buildCmd(sel, commitMsg, showBody ? commitBody : '', breakingChange, breakingMsg, footers);
   const box = document.getElementById('cmdBox');
   if (box) {
-    box.innerHTML = '<button class="copy-btn" id="copyBtn" onclick="copyCmd()">COPY</button>'+
-      (cmd ? highlightCmd(cmd) : '<span class="cp" style="opacity:0.4">select files above</span>');
+    box.innerHTML = (cmd ? highlightCmd(cmd) : '<span class="cp" style="opacity:0.4">select files above</span>');
   }
 }
 

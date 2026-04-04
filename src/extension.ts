@@ -746,17 +746,6 @@ function render() {
       '<button class="footer-remove" data-idx="'+i+'" onclick="removeFooter(+this.dataset.idx)" title="Remove">×</button>'+
     '</div>';
   }).join('');
-    '<div class="msg-section">'+
-      '<div class="section-label-row">'+
-        '<span class="section-label" style="color:var(--vscode-errorForeground)">⚠ Breaking Change</span>'+
-        '<button class="toggle-btn" onclick="toggleBreaking()">'+(breakingChange ? '▾ remove' : '▸ add')+'</button>'+
-      '</div>'+
-      (breakingChange ?
-        '<div class="msg-wrap">'+
-          '<textarea class="msg-edit" rows="2" id="breakingEdit" placeholder="describe what breaks and how to migrate..." oninput="onBreakingEdit(this.value)">'+esc(breakingMsg)+'</textarea>'+
-        '</div>'
-      : '')+
-    '</div>';
 
   const breakingSection =
     '<div class="msg-section">'+

@@ -13,9 +13,17 @@
         "command": "gimmit.open",
         "title": "gimmit: Open"
       }
-    ],
+    ],"viewsContainers": {
+      "activitybar": [
+        {
+          "id": "gimmit",
+          "title": "gimmit",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
     "views": {
-      "scm": [
+      "gimmit": [
         {
           "type": "webview",
           "id": "gimmit.sidebar",

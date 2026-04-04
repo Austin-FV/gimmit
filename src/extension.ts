@@ -468,22 +468,27 @@ function getWebviewContent(files: ChangedFile[]): string {
   }
 
   .empty{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    height:100%;
     text-align:center;
-    padding:24px 0;
+    padding:24px;
     color:var(--vscode-descriptionForeground);
     font-size:12px;
-    line-height:1.8;
+    line-height:1.6;
+    box-sizing:border-box;
   }
 
 </style>
 </head>
 <body>
-<div id="scrollable" style="flex:1;overflow-y:auto;padding:12px;overflow-x:hidden">
+<div id="scrollable" style="flex:1;overflow-y:auto;padding:12px;overflow-x:hidden;display:flex;flex-direction:column">
 <div class="header">
   <h1>gimmit</h1>
   <p>Select files · pick type · copy command</p>
 </div>
-<div id="root"></div>
+<div id="root" style="flex:1;display:flex;flex-direction:column"></div>
 </div>
 <div id="cmd-footer"></div>
 
@@ -635,7 +640,7 @@ function render() {
   const selected = files.filter(f => selectedPaths.has(f.filepath));
 
   if (!files.length) {
-    root.innerHTML = '<div class="empty"><span>✓</span>No changed files.<br>Edits appear here automatically.</div>';
+    root.innerHTML = '<div class="empty">No changed files.<br>Edits appear here automatically.</div>';
     const footer = document.getElementById('cmd-footer');
     if (footer) footer.innerHTML = '';
     return;
@@ -1011,6 +1016,37 @@ render();
 </html>`;
 }
 
+// ─── No Workspace Content ─────────────────────────────────────────────────────
+
+function getNoWorkspaceContent(): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<style>
+  body{
+    background:var(--vscode-sideBar-background);
+    color:var(--vscode-descriptionForeground);
+    font-family:var(--vscode-font-family);
+    font-size:var(--vscode-font-size);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    height:100vh;
+    margin:0;
+    text-align:center;
+    padding:24px;
+    box-sizing:border-box;
+  }
+  p{line-height:1.6;margin:0}
+</style>
+</head>
+<body>
+  <p>No folder open.<br/>Open a git repository to use Gimmit.</p>
+</body>
+</html>`;
+}
+
 // ─── Repo Root Detection ──────────────────────────────────────────────────────
 
 function getRepoRoot(filePath: string): string | undefined {
@@ -1031,16 +1067,17 @@ class GitCommitViewProvider implements vscode.WebviewViewProvider {
   private _watcher?: fs.FSWatcher;
   private _disposables: vscode.Disposable[] = [];
 
-  constructor(private _repoRoot: string) {}
+  constructor(private _repoRoot: string | undefined) {}
 
-  public setRepoRoot(root: string) {
+  public setRepoRoot(root: string | undefined) {
     if (root === this._repoRoot) return;
     this._repoRoot = root;
     this._stopWatcher();
     if (this._view) {
-      // Reset the webview entirely — clean slate for the new repo
-      this._view.webview.html = getWebviewContent(getChangedFiles(root));
-      this._startWatcher();
+      this._view.webview.html = root
+        ? getWebviewContent(getChangedFiles(root))
+        : getNoWorkspaceContent();
+      if (root) this._startWatcher();
     }
   }
 
@@ -1051,23 +1088,26 @@ class GitCommitViewProvider implements vscode.WebviewViewProvider {
   ) {
     this._view = webviewView;
     webviewView.webview.options = { enableScripts: true };
-    webviewView.webview.html = getWebviewContent(getChangedFiles(this._repoRoot));
+    webviewView.webview.html = this._repoRoot
+      ? getWebviewContent(getChangedFiles(this._repoRoot))
+      : getNoWorkspaceContent();
 
     webviewView.webview.onDidReceiveMessage((msg) => {
       if (msg.command === "refresh") this._refresh();
     });
 
-    this._startWatcher();
+    if (this._repoRoot) this._startWatcher();
     webviewView.onDidDispose(() => this._stopWatcher());
   }
 
   private _refresh() {
-    if (!this._view) return;
+    if (!this._view || !this._repoRoot) return;
     const files = getChangedFiles(this._repoRoot);
     this._view.webview.postMessage({ command: "updateFiles", files });
   }
 
   private _startWatcher() {
+    if (!this._repoRoot) return;
     this._stopWatcher();
     const gitDir = path.join(this._repoRoot, ".git");
     if (!fs.existsSync(gitDir)) return;
@@ -1104,9 +1144,7 @@ class GitCommitViewProvider implements vscode.WebviewViewProvider {
 
 export function activate(context: vscode.ExtensionContext) {
   const workspaceFolders = vscode.workspace.workspaceFolders;
-  if (!workspaceFolders || workspaceFolders.length === 0) return;
-
-  const initialRoot = workspaceFolders[0].uri.fsPath;
+  const initialRoot = workspaceFolders?.[0]?.uri.fsPath;
   const provider = new GitCommitViewProvider(initialRoot);
 
   context.subscriptions.push(
@@ -1123,6 +1161,16 @@ export function activate(context: vscode.ExtensionContext) {
       if (!editor || editor.document.uri.scheme !== "file") return;
       const root = getRepoRoot(editor.document.uri.fsPath);
       if (root) provider.setRepoRoot(root);
+    })
+  );
+
+  // Handle workspace folders being added when none were open
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeWorkspaceFolders(e => {
+      if (e.added.length > 0) {
+        const root = getRepoRoot(e.added[0].uri.fsPath);
+        if (root) provider.setRepoRoot(root);
+      }
     })
   );
 

@@ -578,8 +578,7 @@ function buildMsg(selected, type) {
     return 'update ' + names.slice(0, 2).join(', ') + ' and ' + (names.length - 2) + ' more files';
   }
 
-  const dirs = [...new Set(selected.map(f => { const p=f.filepath.split('/'); return p.length>1?p[0]:''; }).filter(Boolean))];
-  const scope = customScope || (dirs.length === 1 ? dirs[0] : '');
+  const scope = customScope;
   const names = selected.map(f => f.filepath.split('/').pop().replace(/\.[^.]+$/, ''));
   let desc;
   if (names.length === 1) {

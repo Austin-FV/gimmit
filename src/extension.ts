@@ -1009,6 +1009,18 @@ render();
 </html>`;
 }
 
+// ─── Repo Root Detection ──────────────────────────────────────────────────────
+
+function getRepoRoot(filePath: string): string | undefined {
+  try {
+    return execSync("git rev-parse --show-toplevel", {
+      cwd: path.dirname(filePath)
+    }).toString().trim();
+  } catch {
+    return undefined;
+  }
+}
+
 // ─── Sidebar Provider ─────────────────────────────────────────────────────────
 
 class GitCommitViewProvider implements vscode.WebviewViewProvider {
@@ -1017,7 +1029,18 @@ class GitCommitViewProvider implements vscode.WebviewViewProvider {
   private _watcher?: fs.FSWatcher;
   private _disposables: vscode.Disposable[] = [];
 
-  constructor(private readonly _repoRoot: string) {}
+  constructor(private _repoRoot: string) {}
+
+  public setRepoRoot(root: string) {
+    if (root === this._repoRoot) return;
+    this._repoRoot = root;
+    this._stopWatcher();
+    if (this._view) {
+      // Reset the webview entirely — clean slate for the new repo
+      this._view.webview.html = getWebviewContent(getChangedFiles(root));
+      this._startWatcher();
+    }
+  }
 
   resolveWebviewView(
     webviewView: vscode.WebviewView,
@@ -1081,8 +1104,8 @@ export function activate(context: vscode.ExtensionContext) {
   const workspaceFolders = vscode.workspace.workspaceFolders;
   if (!workspaceFolders || workspaceFolders.length === 0) return;
 
-  const repoRoot = workspaceFolders[0].uri.fsPath;
-  const provider = new GitCommitViewProvider(repoRoot);
+  const initialRoot = workspaceFolders[0].uri.fsPath;
+  const provider = new GitCommitViewProvider(initialRoot);
 
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(
@@ -1090,6 +1113,15 @@ export function activate(context: vscode.ExtensionContext) {
       provider,
       { webviewOptions: { retainContextWhenHidden: true } }
     )
+  );
+
+  // Switch repo when the user moves to a file in a different git repo
+  context.subscriptions.push(
+    vscode.window.onDidChangeActiveTextEditor(editor => {
+      if (!editor || editor.document.uri.scheme !== "file") return;
+      const root = getRepoRoot(editor.document.uri.fsPath);
+      if (root) provider.setRepoRoot(root);
+    })
   );
 
   context.subscriptions.push(

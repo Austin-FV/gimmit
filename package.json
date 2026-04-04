@@ -28,7 +28,8 @@
           "type": "webview",
           "id": "gimmit.sidebar",
           "name": "gimmit",
-          "when": "true"
+          "when": "true",
+          "icon": "media/icon.svg"
         }
       ]
     }

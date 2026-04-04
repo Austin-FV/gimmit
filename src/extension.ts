@@ -619,6 +619,40 @@ function getWebviewContent(files: ChangedFile[], aiState: AiState): string {
     border-color:var(--vscode-terminal-ansiGreen, #4ade80);
   }
 
+  .run-btn{
+    font-size:11px;
+    font-family:var(--vscode-font-family);
+    font-weight:600;
+    letter-spacing:0.04em;
+    background:var(--vscode-button-background);
+    border:1px solid transparent;
+    border-radius:3px;
+    color:var(--vscode-button-foreground);
+    padding:3px 10px;
+    cursor:pointer;
+    transition:background 0.1s, color 0.15s, border-color 0.15s;
+  }
+  .run-btn:hover{opacity:0.9}
+  .run-btn:disabled{opacity:0.4;cursor:default}
+  .run-btn.ok{
+    background:var(--vscode-terminal-ansiGreen, #4ade80);
+    color:#000;
+  }
+  .run-btn.fail{
+    background:var(--vscode-errorForeground);
+    color:#fff;
+  }
+
+  .cmd-btns{display:flex;gap:6px;align-items:center}
+
+  .cmd-error{
+    font-size:10px;
+    color:var(--vscode-errorForeground);
+    margin-top:6px;
+    word-break:break-word;
+    line-height:1.4;
+  }
+
   .empty{
     display:flex;
     align-items:center;
@@ -1137,11 +1171,15 @@ function render() {
     '<div class="cmd-section">'+
       '<div class="section-label-row">'+
         '<span class="section-label">Git Command</span>'+
-        '<button class="copy-btn" id="copyBtn" onclick="copyCmd()">Copy</button>'+
+        '<div class="cmd-btns">'+
+          '<button class="copy-btn" id="copyBtn" onclick="copyCmd()">Copy</button>'+
+          '<button class="run-btn" id="runBtn" onclick="runCmd()"'+(cmd?'':' disabled')+'>Run</button>'+
+        '</div>'+
       '</div>'+
       '<div class="cmd-box" id="cmdBox">'+
         cmdHtml+
       '</div>'+
+      '<div id="cmdError"></div>'+
     '</div>';
 }
 
@@ -1296,6 +1334,27 @@ function copyCmd() {
       btn.textContent='Copied!'; btn.classList.add('ok');
       setTimeout(()=>{ btn.textContent='Copy'; btn.classList.remove('ok'); }, 1800);
     }
+  });
+}
+
+function runCmd() {
+  const sel = files.filter(f => selectedPaths.has(f.filepath));
+  const cmd = buildCmd(sel, commitMsg, showBody ? commitBody : '', breakingChange, breakingMsg, footers);
+  if (!cmd) return;
+
+  const btn = document.getElementById('runBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Running…'; }
+  const errBox = document.getElementById('cmdError');
+  if (errBox) errBox.innerHTML = '';
+
+  vscode.postMessage({
+    command: 'runGitCommand',
+    filePaths: sel.map(f => f.filepath),
+    commitMsg: commitMsg,
+    commitBody: showBody ? commitBody : '',
+    breakingChange: breakingChange,
+    breakingMsg: breakingMsg,
+    footers: footers,
   });
 }
 
@@ -1574,6 +1633,33 @@ window.addEventListener('message', e => {
       }
     }
     render();
+  } else if (data.command === 'runResult') {
+    const btn = document.getElementById('runBtn');
+    const errBox = document.getElementById('cmdError');
+    if (data.error) {
+      if (btn) {
+        btn.textContent = 'Failed'; btn.classList.add('fail'); btn.disabled = false;
+        setTimeout(()=>{ btn.textContent='Run'; btn.classList.remove('fail'); }, 2500);
+      }
+      if (errBox) errBox.innerHTML = '<div class="cmd-error">'+esc(data.error)+'</div>';
+    } else {
+      if (btn) {
+        btn.textContent = 'Committed!'; btn.classList.add('ok');
+        setTimeout(()=>{ btn.textContent='Run'; btn.classList.remove('ok'); }, 2500);
+      }
+      if (errBox) errBox.innerHTML = '';
+      // Reset state after successful commit
+      userEditedMsg = false;
+      userEditedBody = false;
+      commitBody = '';
+      showBody = false;
+      breakingChange = false;
+      breakingMsg = '';
+      footers = [];
+      customScope = '';
+      // Files will update via the watcher, but force a refresh
+      vscode.postMessage({ command: 'refresh' });
+    }
   }
 });
 
@@ -1772,6 +1858,10 @@ class GitCommitViewProvider implements vscode.WebviewViewProvider {
       case "aiGenerate":
         await this._handleAiGenerate(msg);
         break;
+
+      case "runGitCommand":
+        this._handleRunGitCommand(msg);
+        break;
     }
   }
 
@@ -1831,6 +1921,71 @@ class GitCommitViewProvider implements vscode.WebviewViewProvider {
         command: "aiResult",
         mode: msg.mode,
         error: err.message || "AI generation failed",
+      });
+    }
+  }
+
+  private _handleRunGitCommand(msg: any) {
+    if (!this._view || !this._repoRoot) return;
+
+    const filePaths: string[] = msg.filePaths || [];
+    if (!filePaths.length) {
+      this._view.webview.postMessage({
+        command: "runResult",
+        error: "No files selected",
+      });
+      return;
+    }
+
+    try {
+      // Stage files
+      const paths = filePaths.map((f: string) => `"${f}"`).join(" ");
+      execSync(`git add ${paths}`, { cwd: this._repoRoot, stdio: "pipe" });
+
+      // Build commit args
+      const safeMsg = msg.commitMsg.replace(/"/g, '\\"');
+      const args = ['-m', `"${safeMsg}"`];
+
+      if (msg.commitBody && msg.commitBody.trim()) {
+        const safeBody = msg.commitBody.replace(/"/g, '\\"');
+        args.push('-m', `"${safeBody}"`);
+      }
+
+      // Build footer block
+      const footerLines: string[] = [];
+      if (msg.breakingChange && msg.breakingMsg && msg.breakingMsg.trim()) {
+        footerLines.push('BREAKING CHANGE: ' + msg.breakingMsg.replace(/"/g, '\\"'));
+      }
+      if (msg.footers && msg.footers.length) {
+        for (const f of msg.footers) {
+          const token = f.token === 'Custom' ? f.customToken : f.token;
+          if (token && token.trim() && f.value && f.value.trim()) {
+            footerLines.push(token + ': ' + f.value.replace(/"/g, '\\"'));
+          }
+        }
+      }
+      if (footerLines.length) {
+        args.push('-m', `"${footerLines.join('\n')}"`);
+      }
+
+      const commitCmd = `git commit ${args.join(' ')}`;
+      execSync(commitCmd, { cwd: this._repoRoot, stdio: "pipe" });
+
+      this._view.webview.postMessage({ command: "runResult", success: true });
+
+      // Refresh file list after successful commit
+      setTimeout(() => this._refresh(), 300);
+
+    } catch (err: any) {
+      let errorMsg = "Git command failed";
+      if (err.stderr) {
+        errorMsg = err.stderr.toString().trim();
+      } else if (err.message) {
+        errorMsg = err.message;
+      }
+      this._view.webview.postMessage({
+        command: "runResult",
+        error: errorMsg,
       });
     }
   }

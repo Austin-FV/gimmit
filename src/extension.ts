@@ -1051,12 +1051,36 @@ function getNoWorkspaceContent(): string {
 
 function getRepoRoot(filePath: string): string | undefined {
   try {
-    return execSync("git rev-parse --show-toplevel", {
-      cwd: path.dirname(filePath)
-    }).toString().trim();
+    let cwd: string;
+    try {
+      cwd = fs.statSync(filePath).isDirectory() ? filePath : path.dirname(filePath);
+    } catch {
+      cwd = path.dirname(filePath);
+    }
+    return execSync("git rev-parse --show-toplevel", { cwd }).toString().trim();
   } catch {
     return undefined;
   }
+}
+
+// Scan all workspace folders and their immediate children to find a git repo.
+// Handles the case where the workspace root is a parent folder containing the repo.
+function findRepoFromWorkspace(folders: readonly vscode.WorkspaceFolder[]): string | undefined {
+  for (const folder of folders) {
+    const root = getRepoRoot(folder.uri.fsPath);
+    if (root) return root;
+
+    // Try immediate subdirectories
+    try {
+      const entries = fs.readdirSync(folder.uri.fsPath, { withFileTypes: true });
+      for (const entry of entries) {
+        if (!entry.isDirectory() || entry.name.startsWith('.') || entry.name === 'node_modules') continue;
+        const subRoot = getRepoRoot(path.join(folder.uri.fsPath, entry.name));
+        if (subRoot) return subRoot;
+      }
+    } catch { /* can't read directory */ }
+  }
+  return undefined;
 }
 
 // ─── Sidebar Provider ─────────────────────────────────────────────────────────
@@ -1144,8 +1168,16 @@ class GitCommitViewProvider implements vscode.WebviewViewProvider {
 
 export function activate(context: vscode.ExtensionContext) {
   const workspaceFolders = vscode.workspace.workspaceFolders;
-  const initialRoot = workspaceFolders?.[0]?.uri.fsPath;
-  const provider = new GitCommitViewProvider(initialRoot);
+
+  // Scan workspace folders (and their children) for an actual git repo
+  const initialRoot = workspaceFolders ? findRepoFromWorkspace(workspaceFolders) : undefined;
+
+  // If workspace scan didn't find anything, try the currently active editor
+  const activeEditorRoot = !initialRoot && vscode.window.activeTextEditor?.document.uri.scheme === "file"
+    ? getRepoRoot(vscode.window.activeTextEditor.document.uri.fsPath)
+    : undefined;
+
+  const provider = new GitCommitViewProvider(initialRoot ?? activeEditorRoot);
 
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(
@@ -1155,7 +1187,7 @@ export function activate(context: vscode.ExtensionContext) {
     )
   );
 
-  // Switch repo when the user moves to a file in a different git repo
+  // Switch repo when the user opens a file in a different git repo
   context.subscriptions.push(
     vscode.window.onDidChangeActiveTextEditor(editor => {
       if (!editor || editor.document.uri.scheme !== "file") return;
@@ -1164,12 +1196,21 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
-  // Handle workspace folders being added when none were open
+  // Handle workspace folders being added or removed
   context.subscriptions.push(
     vscode.workspace.onDidChangeWorkspaceFolders(e => {
       if (e.added.length > 0) {
-        const root = getRepoRoot(e.added[0].uri.fsPath);
-        if (root) provider.setRepoRoot(root);
+        const root = findRepoFromWorkspace(e.added);
+        if (root) { provider.setRepoRoot(root); return; }
+      }
+      if (e.removed.length > 0) {
+        const remaining = vscode.workspace.workspaceFolders;
+        if (!remaining || remaining.length === 0) {
+          provider.setRepoRoot(undefined);
+        } else {
+          const root = findRepoFromWorkspace(remaining);
+          if (root) provider.setRepoRoot(root);
+        }
       }
     })
   );

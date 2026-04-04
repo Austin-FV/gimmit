@@ -636,6 +636,8 @@ function render() {
 
   if (!files.length) {
     root.innerHTML = '<div class="empty"><span>✓</span>No changed files.<br>Edits appear here automatically.</div>';
+    const footer = document.getElementById('cmd-footer');
+    if (footer) footer.innerHTML = '';
     return;
   }
 

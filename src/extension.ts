@@ -35,7 +35,7 @@ function detectChangeType(filepath: string, status: string): CommitType {
 function getChangedFiles(repoRoot: string): ChangedFile[] {
   try {
     console.log("repoRoot:", repoRoot);
-    const output = execSync("git status --porcelain", { cwd: repoRoot }).toString();
+    const output = execSync("git status --porcelain -uall", { cwd: repoRoot }).toString();
     console.log("git output:", JSON.stringify(output));
     return output
       .split("\n")

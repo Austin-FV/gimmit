@@ -65,13 +65,16 @@ function getWebviewContent(files: ChangedFile[]): string {
 <style>
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 
+  html,body{height:100%;margin:0}
+
   body{
     background:var(--vscode-sideBar-background);
     color:var(--vscode-foreground);
     font-family:var(--vscode-font-family);
     font-size:var(--vscode-font-size);
-    padding:12px;
-    overflow-x:hidden;
+    overflow:hidden;
+    display:flex;
+    flex-direction:column;
   }
 
   .header{margin-bottom:14px}
@@ -420,7 +423,12 @@ function getWebviewContent(files: ChangedFile[]): string {
   }
   .add-footer-btn:hover{text-decoration:underline}
 
-  .cmd-section{margin-bottom:10px}
+  .cmd-section{
+    flex-shrink:0;
+    padding:10px 12px;
+    background:var(--vscode-sideBar-background);
+    border-top:1px solid var(--vscode-input-border, transparent);
+  }
   .cmd-box{
     position:relative;
     background:var(--vscode-textCodeBlock-background, var(--vscode-input-background));
@@ -470,11 +478,14 @@ function getWebviewContent(files: ChangedFile[]): string {
 </style>
 </head>
 <body>
+<div id="scrollable" style="flex:1;overflow-y:auto;padding:12px;overflow-x:hidden">
 <div class="header">
   <h1>gimmit</h1>
   <p>Select files · pick type · copy command</p>
 </div>
 <div id="root"></div>
+</div>
+<div id="cmd-footer"></div>
 
 <script>
 const vscode = acquireVsCodeApi();
@@ -773,7 +784,9 @@ function render() {
     '</div>'+
     bodySection+
     footerSection+
-    breakingSection+
+    breakingSection;
+
+  document.getElementById('cmd-footer').innerHTML =
     '<div class="cmd-section">'+
       '<div class="section-label-row">'+
         '<span class="section-label">Git Command</span>'+

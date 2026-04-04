@@ -6,7 +6,7 @@
 	"version": "0.2.0",
 	"configurations": [
 		{
-			"name": "Run Git Commit Helper",
+			"name": "Run Gimmit",
 			"type": "extensionHost",
 			"request": "launch",
 			"args": [

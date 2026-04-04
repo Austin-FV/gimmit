@@ -2,6 +2,15 @@ import * as vscode from "vscode";
 import { execSync } from "child_process";
 import * as path from "path";
 import * as fs from "fs";
+import {
+  AiProvider,
+  AiConfig,
+  AiGenerateRequest,
+  PROVIDER_MODELS,
+  getAllModels,
+  getDefaultModel,
+  generateWithAi,
+} from "./ai-service";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -51,10 +60,76 @@ function getChangedFiles(repoRoot: string): ChangedFile[] {
   }
 }
 
+// ─── Git Diff ────────────────────────────────────────────────────────────────
+
+function getGitDiff(repoRoot: string, filePaths: string[]): string {
+  if (!filePaths.length) return "";
+  try {
+    // Get diff for tracked files (staged + unstaged)
+    const tracked = filePaths.filter((f) => {
+      try {
+        execSync(`git ls-files --error-unmatch "${f}"`, {
+          cwd: repoRoot,
+          stdio: "pipe",
+        });
+        return true;
+      } catch {
+        return false;
+      }
+    });
+    const untracked = filePaths.filter((f) => !tracked.includes(f));
+
+    let diff = "";
+    if (tracked.length) {
+      try {
+        // Staged changes
+        const stagedDiff = execSync(
+          `git diff --cached -- ${tracked.map((f) => `"${f}"`).join(" ")}`,
+          { cwd: repoRoot, maxBuffer: 1024 * 1024 }
+        ).toString();
+        diff += stagedDiff;
+      } catch { /* ignore */ }
+      try {
+        // Unstaged changes
+        const unstagedDiff = execSync(
+          `git diff -- ${tracked.map((f) => `"${f}"`).join(" ")}`,
+          { cwd: repoRoot, maxBuffer: 1024 * 1024 }
+        ).toString();
+        diff += unstagedDiff;
+      } catch { /* ignore */ }
+    }
+
+    // For untracked files, show their content as "new file"
+    for (const f of untracked) {
+      try {
+        const content = fs.readFileSync(path.join(repoRoot, f), "utf-8");
+        const truncated = content.slice(0, 2000);
+        diff += `\n--- /dev/null\n+++ b/${f}\n@@ -0,0 +1 @@\n${truncated
+          .split("\n")
+          .map((l) => `+${l}`)
+          .join("\n")}\n`;
+      } catch { /* ignore */ }
+    }
+
+    return diff;
+  } catch (e) {
+    console.error("getGitDiff error:", e);
+    return "";
+  }
+}
+
 // ─── Webview HTML ─────────────────────────────────────────────────────────────
 
-function getWebviewContent(files: ChangedFile[]): string {
+interface AiState {
+  provider: AiProvider | "none";
+  modelId: string;
+  hasKey: Record<AiProvider, boolean>;
+}
+
+function getWebviewContent(files: ChangedFile[], aiState: AiState): string {
   const filesJson = JSON.stringify(files);
+  const aiStateJson = JSON.stringify(aiState);
+  const modelsJson = JSON.stringify(PROVIDER_MODELS);
 
   return /* html */`<!DOCTYPE html>
 <html lang="en">
@@ -234,6 +309,7 @@ function getWebviewContent(files: ChangedFile[]): string {
     justify-content:space-between;
     margin-bottom:4px;
   }
+  .section-label-row-right{display:flex;align-items:center;gap:8px}
   .toggle-btn{
     font-size:10px;
     background:transparent;
@@ -244,6 +320,19 @@ function getWebviewContent(files: ChangedFile[]): string {
     padding:0;
   }
   .toggle-btn:hover{text-decoration:underline}
+  .collapsible-header{
+    display:flex;
+    align-items:center;
+    gap:4px;
+    cursor:pointer;
+    user-select:none;
+  }
+  .collapsible-header:hover .section-label{color:var(--vscode-foreground)}
+  .collapsible-header .section-label{margin-bottom:0}
+  .collapsible-arrow{
+    font-size:10px;
+    color:var(--vscode-descriptionForeground);
+  }
   .section-label{
     font-size:10px;
     font-weight:600;
@@ -276,6 +365,7 @@ function getWebviewContent(files: ChangedFile[]): string {
     border:1px solid var(--vscode-input-border, transparent);
     border-radius:3px;
     overflow:hidden;
+    position:relative;
   }
   .msg-input-row:focus-within{border-color:var(--vscode-focusBorder)}
   .msg-prefix{
@@ -298,7 +388,7 @@ function getWebviewContent(files: ChangedFile[]): string {
     color:var(--vscode-input-foreground);
     font-family:var(--vscode-font-family);
     font-size:12px;
-    padding:6px 8px;
+    padding:6px 32px 6px 8px;
     outline:none;
     min-width:0;
     line-height:1.5;
@@ -313,21 +403,47 @@ function getWebviewContent(files: ChangedFile[]): string {
   }
   .char-counter.over{color:var(--vscode-errorForeground);font-weight:600}
 
-  .regen-btn{
+  .reset-link{
     font-size:10px;
     background:transparent;
-    border:1px solid var(--vscode-button-secondaryBorder, var(--vscode-input-border));
-    border-radius:3px;
+    border:none;
     color:var(--vscode-descriptionForeground);
-    padding:2px 6px;
     cursor:pointer;
     font-family:var(--vscode-font-family);
-    transition:background 0.1s;
+    padding:0;
+    opacity:0.7;
     flex-shrink:0;
   }
-  .msg-wrap .regen-btn{position:absolute;top:5px;right:5px}
-  .msg-input-row .regen-btn{margin:4px 5px 4px 0}
-  .regen-btn:hover{background:var(--vscode-toolbar-hoverBackground);color:var(--vscode-foreground)}
+  .reset-link:hover{color:var(--vscode-foreground);opacity:1}
+
+  .ai-inline-btn{
+    position:absolute;
+    right:5px;
+    top:50%;
+    transform:translateY(-50%);
+    background:var(--vscode-input-background);
+    border:1px solid var(--vscode-input-border, transparent);
+    border-radius:3px;
+    color:var(--vscode-descriptionForeground);
+    font-size:11px;
+    padding:1px 5px;
+    cursor:pointer;
+    font-family:var(--vscode-font-family);
+    transition:all 0.15s;
+    display:inline-flex;
+    align-items:center;
+    gap:2px;
+    line-height:1.4;
+    z-index:1;
+  }
+  .ai-inline-btn:hover{
+    color:var(--vscode-foreground);
+    border-color:var(--vscode-button-background);
+  }
+  .ai-inline-btn:disabled{opacity:0.35;cursor:default;pointer-events:none}
+  .ai-inline-btn .ai-gen-spark{font-size:10px}
+
+  .body-ai-inline{top:6px;transform:none}
 
   .scope-bar{
     display:flex;
@@ -516,6 +632,105 @@ function getWebviewContent(files: ChangedFile[]): string {
     box-sizing:border-box;
   }
 
+  /* ── AI Section ─────────────────────────────────────── */
+  .ai-section{
+    margin-bottom:10px;
+    border:1px solid var(--vscode-input-border, transparent);
+    border-radius:4px;
+    overflow:hidden;
+  }
+  .ai-header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:6px 8px;
+    background:var(--vscode-input-background);
+    cursor:pointer;
+    user-select:none;
+  }
+  .ai-header:hover{background:var(--vscode-list-hoverBackground)}
+  .ai-header-left{display:flex;align-items:center;gap:6px}
+  .ai-spark{font-size:12px;line-height:1}
+  .ai-title{
+    font-size:10px;
+    font-weight:600;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    color:var(--vscode-descriptionForeground);
+  }
+  .ai-status-dot{
+    width:6px;height:6px;
+    border-radius:50%;
+    flex-shrink:0;
+  }
+  .ai-status-dot.active{background:#4ade80}
+  .ai-status-dot.inactive{background:var(--vscode-descriptionForeground);opacity:0.3}
+  .ai-toggle-arrow{
+    font-size:10px;
+    color:var(--vscode-descriptionForeground);
+  }
+
+  .ai-body{padding:8px;display:flex;flex-direction:column;gap:8px}
+
+  .ai-row{display:flex;align-items:center;gap:6px}
+  .ai-row-label{
+    font-size:10px;
+    color:var(--vscode-descriptionForeground);
+    font-weight:600;
+    white-space:nowrap;
+    min-width:52px;
+  }
+  .ai-select{
+    flex:1;
+    background:var(--vscode-input-background);
+    border:1px solid var(--vscode-input-border, transparent);
+    border-radius:3px;
+    color:var(--vscode-input-foreground);
+    font-family:var(--vscode-font-family);
+    font-size:11px;
+    padding:4px 6px;
+    cursor:pointer;
+    outline:none;
+    min-width:0;
+  }
+  .ai-select:focus{border-color:var(--vscode-focusBorder)}
+
+  .ai-key-row{display:flex;align-items:center;gap:6px}
+  .ai-key-status{
+    font-size:10px;
+    flex-shrink:0;
+  }
+  .ai-key-status.saved{color:#4ade80}
+  .ai-key-status.missing{color:var(--vscode-errorForeground);opacity:0.7}
+  .ai-key-manage{
+    font-size:10px;
+    background:transparent;
+    border:none;
+    color:var(--vscode-textLink-foreground);
+    cursor:pointer;
+    font-family:var(--vscode-font-family);
+    padding:0;
+    flex-shrink:0;
+  }
+  .ai-key-manage:hover{text-decoration:underline}
+
+  @keyframes ai-spin{to{transform:rotate(360deg)}}
+  .ai-loading{
+    display:inline-block;
+    width:10px;height:10px;
+    border:1.5px solid var(--vscode-descriptionForeground);
+    border-top-color:transparent;
+    border-radius:50%;
+    animation:ai-spin 0.6s linear infinite;
+  }
+
+  .ai-err{
+    font-size:10px;
+    color:var(--vscode-errorForeground);
+    margin-top:2px;
+    word-break:break-word;
+  }
+
 </style>
 </head>
 <body>
@@ -559,6 +774,19 @@ let breakingMsg = '';
 let footers = []; // [{id, token, customToken, value}]
 let customScope = '';
 let commitMsg  = buildMsg(files.filter(f => selectedPaths.has(f.filepath)), commitType);
+
+// ── AI state ──
+const AI_MODELS = ${modelsJson};
+let aiState = ${aiStateJson};
+let showAiSettings = false;
+let aiGeneratingMsg = false;
+let aiGeneratingBody = false;
+let aiMsgError = '';
+let aiBodyError = '';
+
+function isAiReady() {
+  return aiState.provider !== 'none' && aiState.hasKey[aiState.provider];
+}
 
 function inferDominantType(fs) {
   if (!fs.length) return 'feat';
@@ -713,19 +941,33 @@ function render() {
 
   const FOOTER_TOKENS = ['Refs', 'Closes', 'Fixes', 'Co-authored-by', 'Reviewed-by', 'See-also', 'Custom'];
 
+  const aiBodyInline = isAiReady()
+    ? '<button class="ai-inline-btn body-ai-inline" id="aiBodyBtn" onclick="event.stopPropagation();aiGenerateBody()"'+(aiGeneratingBody?' disabled':'')+'>'+
+        (aiGeneratingBody ? '<span class="ai-loading"></span>' : '<span class="ai-gen-spark">✦</span>')+
+      '</button>'
+    : '';
+
   const bodySection =
     '<div class="msg-section">'+
       '<div class="section-label-row">'+
-        '<span class="section-label">Commit Body</span>'+
-        '<button class="toggle-btn" onclick="toggleBody()">'+(showBody ? '▾ hide' : '▸ add body')+'</button>'+
+        '<div class="collapsible-header" onclick="toggleBody()">'+
+          '<span class="collapsible-arrow">'+(showBody?'▾':'▸')+'</span>'+
+          '<span class="section-label">Commit Body</span>'+
+        '</div>'+
+        (showBody ?
+          '<div class="section-label-row-right" id="bodyLabelRight">'+
+            (userEditedBody ? '<button class="reset-link" id="bodyResetBtn" onclick="regenBody()">↺ reset</button>' : '')+
+          '</div>'
+        : '')+
       '</div>'+
       (showBody ? (()=>{
         const longest = commitBody.split(String.fromCharCode(10)).reduce((max,l)=>Math.max(max,l.length),0);
         return '<div class="msg-wrap">'+
           '<textarea class="msg-edit" rows="4" id="bodyEdit" oninput="onBodyEdit(this.value)">'+esc(commitBody)+'</textarea>'+
-          '<button class="regen-btn" onclick="regenBody()">↺ regen</button>'+
+          aiBodyInline+
         '</div>'+
-        '<div class="body-counter '+(longest>72?'over':'')+'" id="bodyCounter">longest line: '+longest+' / 72</div>';
+        '<div class="body-counter '+(longest>72?'over':'')+'" id="bodyCounter">longest line: '+longest+' / 72</div>'+
+        (aiBodyError ? '<div class="ai-err" id="aiBodyErr">'+esc(aiBodyError)+'</div>' : '');
       })() : '')+
     '</div>';
 
@@ -779,7 +1021,65 @@ function render() {
     footerRows+
   '</div>';
 
+  // ── AI settings panel ──
+  const providerOpts = ['none','claude','openai','gemini'].map(p =>
+    '<option value="'+p+'"'+(aiState.provider===p?' selected':'')+'>'+
+      (p==='none' ? 'Disabled' : p.charAt(0).toUpperCase()+p.slice(1))+
+    '</option>'
+  ).join('');
+
+  const modelOpts = aiState.provider !== 'none'
+    ? (AI_MODELS[aiState.provider]||[]).map(m =>
+        '<option value="'+m.id+'"'+(aiState.modelId===m.id?' selected':'')+'>'+esc(m.label)+'</option>'
+      ).join('')
+    : '';
+
+  const hasCurrentKey = aiState.provider !== 'none' && aiState.hasKey[aiState.provider];
+
+  const aiSection =
+    '<div class="ai-section">'+
+      '<div class="ai-header" onclick="toggleAiSettings()">'+
+        '<div class="ai-header-left">'+
+          '<span class="ai-spark">✦</span>'+
+          '<span class="ai-title">AI Assist</span>'+
+          '<span class="ai-status-dot '+(isAiReady()?'active':'inactive')+'"></span>'+
+        '</div>'+
+        '<span class="ai-toggle-arrow">'+(showAiSettings?'▾':'▸')+'</span>'+
+      '</div>'+
+      (showAiSettings ?
+        '<div class="ai-body">'+
+          '<div class="ai-row">'+
+            '<span class="ai-row-label">Provider</span>'+
+            '<select class="ai-select" onchange="onAiProviderChange(this.value)">'+providerOpts+'</select>'+
+          '</div>'+
+          (aiState.provider !== 'none' ?
+            '<div class="ai-row">'+
+              '<span class="ai-row-label">Model</span>'+
+              '<select class="ai-select" onchange="onAiModelChange(this.value)">'+modelOpts+'</select>'+
+            '</div>'+
+            '<div class="ai-key-row">'+
+              '<span class="ai-row-label">API Key</span>'+
+              (hasCurrentKey ?
+                '<span class="ai-key-status saved">● saved</span>'
+              :
+                '<span class="ai-key-status missing">● not set</span>'
+              )+
+              '<button class="ai-key-manage" onclick="manageAiKey()">manage</button>'+
+            '</div>'
+          : '')+
+        '</div>'
+      : '')+
+    '</div>';
+
+  // ── AI inline button for commit message ──
+  const aiMsgInline = isAiReady()
+    ? '<button class="ai-inline-btn" id="aiMsgBtn" onclick="event.stopPropagation();aiGenerateMsg()"'+(aiGeneratingMsg?' disabled':'')+'>'+
+        (aiGeneratingMsg ? '<span class="ai-loading"></span>' : '<span class="ai-gen-spark">✦</span>')+
+      '</button>'
+    : '';
+
   root.innerHTML =
+    aiSection+
     '<div class="type-bar">'+
       '<label>TYPE</label>'+
       '<div class="type-chips">'+chips+'</div>'+
@@ -790,7 +1090,7 @@ function render() {
         'value="'+esc(customScope)+'" oninput="onScopeEdit(this.value)"/>'+
       (customScope ? '<button class="scope-clear" onclick="clearScope()" title="Clear scope">×</button>' : '')+
     '</div>'+
-    '<div class="list-header">'+
+    '<div class="list-header"'+(showFiles?'':' style="margin-bottom:12px"')+'>'+
       '<div style="display:flex;align-items:center;gap:4px;cursor:pointer" onclick="toggleFiles()">'+
         '<span style="font-size:10px;color:var(--vscode-descriptionForeground)">'+(showFiles?'▾':'▸')+'</span>'+
         '<span class="list-label">Changed Files ('+files.length+')</span>'+
@@ -805,7 +1105,10 @@ function render() {
     '</div>'+
     (showFiles ? '<div class="file-list">'+rows+'</div>' : '')+
     '<div class="msg-section">'+
-      '<div class="section-label">Commit Message</div>'+
+      '<div class="section-label-row" id="msgLabelRow">'+
+        '<span class="section-label">Commit Message</span>'+
+        (userEditedMsg ? '<button class="reset-link" id="msgResetBtn" onclick="regenMsg()">↺ reset</button>' : '')+
+      '</div>'+
       (commitType !== 'none' ? (()=>{
         const colonIdx = commitMsg.indexOf(': ');
         const msgPrefix = colonIdx >= 0 ? commitMsg.slice(0, colonIdx + 1) : commitMsg;
@@ -813,17 +1116,18 @@ function render() {
         return '<div class="msg-input-row" id="msgInputRow">'+
           '<span class="msg-prefix" id="msgPrefix">'+esc(msgPrefix)+'</span>'+
           '<input class="msg-desc-input" id="msgDesc" type="text" value="'+esc(msgDesc)+'" oninput="onDescEdit(this.value)"/>'+
-          (userEditedMsg ? '<button class="regen-btn" onclick="regenMsg()">↺ regen</button>' : '')+
+          aiMsgInline+
         '</div>';
       })() :
         '<div class="msg-input-row" id="msgInputRow">'+
           '<input class="msg-desc-input" id="msgEdit" type="text" value="'+esc(commitMsg)+'" oninput="onMsgEdit(this.value)"/>'+
-          '<button class="regen-btn" onclick="regenMsg()">↺ regen</button>'+
+          aiMsgInline+
         '</div>'
       )+
       '<div class="char-counter '+(commitMsg.length > 72 ? 'over' : '')+'" id="charCounter">'+
         commitMsg.length+' / 72'+
       '</div>'+
+      (aiMsgError ? '<div class="ai-err" id="aiMsgErr">'+esc(aiMsgError)+'</div>' : '')+
     '</div>'+
     bodySection+
     footerSection+
@@ -917,12 +1221,28 @@ function selectNone() {
 
 function regenMsg() {
   userEditedMsg = false;
+  aiMsgError = '';
   commitMsg = buildMsg(files.filter(f => selectedPaths.has(f.filepath)), commitType);
   render();
 }
 
 function onDescEdit(val) {
+  const wasEdited = userEditedMsg;
   userEditedMsg = true;
+  aiMsgError = '';
+  const errEl = document.getElementById('aiMsgErr');
+  if (errEl) errEl.remove();
+  if (!wasEdited) {
+    const row = document.getElementById('msgLabelRow');
+    if (row && !document.getElementById('msgResetBtn')) {
+      const btn = document.createElement('button');
+      btn.className = 'reset-link';
+      btn.id = 'msgResetBtn';
+      btn.onclick = function(){ regenMsg(); };
+      btn.textContent = '↺ reset';
+      row.appendChild(btn);
+    }
+  }
   const colonIdx = commitMsg.indexOf(': ');
   const prefix = colonIdx >= 0 ? commitMsg.slice(0, colonIdx + 2) : '';
   commitMsg = prefix + val;
@@ -936,7 +1256,22 @@ function onDescEdit(val) {
 
 function onMsgEdit(val) {
   if (commitType !== 'none') return;
+  const wasEdited = userEditedMsg;
   userEditedMsg = true;
+  aiMsgError = '';
+  const errEl = document.getElementById('aiMsgErr');
+  if (errEl) errEl.remove();
+  if (!wasEdited) {
+    const row = document.getElementById('msgLabelRow');
+    if (row && !document.getElementById('msgResetBtn')) {
+      const btn = document.createElement('button');
+      btn.className = 'reset-link';
+      btn.id = 'msgResetBtn';
+      btn.onclick = function(){ regenMsg(); };
+      btn.textContent = '↺ reset';
+      row.appendChild(btn);
+    }
+  }
   commitMsg = val;
   const counter = document.getElementById('charCounter');
   if (counter) {
@@ -964,32 +1299,6 @@ function copyCmd() {
   });
 }
 
-window.addEventListener('message', e => {
-  if (e.data.command === 'updateFiles') {
-    const newPaths = new Set(e.data.files.map(f => f.filepath));
-    selectedPaths = new Set([...selectedPaths].filter(p => newPaths.has(p)));
-    e.data.files.forEach(f => {
-      if (!files.find(x => x.filepath === f.filepath)) selectedPaths.add(f.filepath);
-    });
-    files = e.data.files;
-    if (commitType !== 'none') {
-      // Always rebuild prefix (scope/type may change), but keep user's description
-      const colonIdx = commitMsg.indexOf(': ');
-      const currentDesc = userEditedMsg && colonIdx >= 0 ? commitMsg.slice(colonIdx + 2) : null;
-      commitMsg = buildMsg(files.filter(f => selectedPaths.has(f.filepath)), commitType);
-      if (currentDesc !== null) {
-        const newColonIdx = commitMsg.indexOf(': ');
-        const newPrefix = newColonIdx >= 0 ? commitMsg.slice(0, newColonIdx + 2) : '';
-        commitMsg = newPrefix + currentDesc;
-      }
-    } else if (!userEditedMsg) {
-      commitMsg = buildMsg(files.filter(f => selectedPaths.has(f.filepath)), commitType);
-    }
-    if (showBody && !userEditedBody) commitBody = buildBody(files.filter(f => selectedPaths.has(f.filepath)));
-    render();
-  }
-});
-
 function toggleFiles() {
   showFiles = !showFiles;
   render();
@@ -1010,12 +1319,28 @@ function toggleBody() {
 
 function regenBody() {
   userEditedBody = false;
+  aiBodyError = '';
   commitBody = buildBody(files.filter(f => selectedPaths.has(f.filepath)));
   render();
 }
 
 function onBodyEdit(val) {
+  const wasEdited = userEditedBody;
   userEditedBody = true;
+  aiBodyError = '';
+  const errEl = document.getElementById('aiBodyErr');
+  if (errEl) errEl.remove();
+  if (!wasEdited) {
+    const row = document.getElementById('bodyLabelRight');
+    if (row && !document.getElementById('bodyResetBtn')) {
+      const btn = document.createElement('button');
+      btn.className = 'reset-link';
+      btn.id = 'bodyResetBtn';
+      btn.onclick = function(){ regenBody(); };
+      btn.textContent = '↺ reset';
+      row.appendChild(btn);
+    }
+  }
   commitBody = val;
   const counter = document.getElementById('bodyCounter');
   if (counter) {
@@ -1141,6 +1466,117 @@ function refreshCmd() {
   }
 }
 
+// ── AI Functions ──
+
+function toggleAiSettings() {
+  showAiSettings = !showAiSettings;
+  render();
+}
+
+function onAiProviderChange(provider) {
+  aiMsgError = '';
+  aiBodyError = '';
+  vscode.postMessage({ command: 'setAiProvider', provider });
+}
+
+function onAiModelChange(modelId) {
+  aiMsgError = '';
+  aiBodyError = '';
+  vscode.postMessage({ command: 'setAiModel', modelId });
+}
+
+function manageAiKey() {
+  vscode.postMessage({ command: 'manageApiKey', provider: aiState.provider });
+}
+
+function aiGenerateMsg() {
+  if (aiGeneratingMsg || !isAiReady()) return;
+  aiGeneratingMsg = true;
+  aiMsgError = '';
+  render();
+  const sel = files.filter(f => selectedPaths.has(f.filepath));
+  vscode.postMessage({
+    command: 'aiGenerate',
+    mode: 'message',
+    filePaths: sel.map(f => f.filepath),
+    commitType: commitType,
+    scope: customScope,
+  });
+}
+
+function aiGenerateBody() {
+  if (aiGeneratingBody || !isAiReady()) return;
+  aiGeneratingBody = true;
+  aiBodyError = '';
+  render();
+  const sel = files.filter(f => selectedPaths.has(f.filepath));
+  vscode.postMessage({
+    command: 'aiGenerate',
+    mode: 'body',
+    filePaths: sel.map(f => f.filepath),
+    commitType: commitType,
+    scope: customScope,
+  });
+}
+
+// Handle messages from extension
+window.addEventListener('message', e => {
+  const data = e.data;
+  if (data.command === 'updateFiles') {
+    const newPaths = new Set(data.files.map(f => f.filepath));
+    selectedPaths = new Set([...selectedPaths].filter(p => newPaths.has(p)));
+    data.files.forEach(f => {
+      if (!files.find(x => x.filepath === f.filepath)) selectedPaths.add(f.filepath);
+    });
+    files = data.files;
+    if (commitType !== 'none') {
+      const colonIdx = commitMsg.indexOf(': ');
+      const currentDesc = userEditedMsg && colonIdx >= 0 ? commitMsg.slice(colonIdx + 2) : null;
+      commitMsg = buildMsg(files.filter(f => selectedPaths.has(f.filepath)), commitType);
+      if (currentDesc !== null) {
+        const newColonIdx = commitMsg.indexOf(': ');
+        const newPrefix = newColonIdx >= 0 ? commitMsg.slice(0, newColonIdx + 2) : '';
+        commitMsg = newPrefix + currentDesc;
+      }
+    } else if (!userEditedMsg) {
+      commitMsg = buildMsg(files.filter(f => selectedPaths.has(f.filepath)), commitType);
+    }
+    if (showBody && !userEditedBody) commitBody = buildBody(files.filter(f => selectedPaths.has(f.filepath)));
+    render();
+  } else if (data.command === 'aiStateUpdate') {
+    aiState = data.aiState;
+    render();
+  } else if (data.command === 'aiResult') {
+    if (data.mode === 'message') {
+      aiGeneratingMsg = false;
+      if (data.error) {
+        aiMsgError = data.error;
+      } else {
+        aiMsgError = '';
+        userEditedMsg = true;
+        if (commitType !== 'none') {
+          const colonIdx = commitMsg.indexOf(': ');
+          const prefix = colonIdx >= 0 ? commitMsg.slice(0, colonIdx + 2) : '';
+          commitMsg = prefix + data.text;
+        } else {
+          commitMsg = data.text;
+        }
+      }
+    } else if (data.mode === 'body') {
+      aiGeneratingBody = false;
+      if (data.error) {
+        aiBodyError = data.error;
+      } else {
+        aiBodyError = '';
+        userEditedBody = true;
+        commitBody = data.text;
+        if (!showBody) showBody = true;
+      }
+    }
+    render();
+  }
+});
+
 render();
 </script>
 </body>
@@ -1221,38 +1657,182 @@ class GitCommitViewProvider implements vscode.WebviewViewProvider {
   private _view?: vscode.WebviewView;
   private _watcher?: fs.FSWatcher;
   private _disposables: vscode.Disposable[] = [];
+  private _context: vscode.ExtensionContext;
 
-  constructor(private _repoRoot: string | undefined) {}
+  constructor(
+    private _repoRoot: string | undefined,
+    context: vscode.ExtensionContext
+  ) {
+    this._context = context;
+  }
 
-  public setRepoRoot(root: string | undefined) {
+  // ── AI State Helpers ──
+
+  private _getAiProvider(): AiProvider | "none" {
+    return this._context.globalState.get<AiProvider | "none">("gimmit.aiProvider", "none");
+  }
+
+  private _getAiModel(): string {
+    const provider = this._getAiProvider();
+    if (provider === "none") return "";
+    return this._context.globalState.get<string>(
+      `gimmit.aiModel.${provider}`,
+      getDefaultModel(provider)
+    );
+  }
+
+  private async _getAiKeyStatus(): Promise<Record<AiProvider, boolean>> {
+    const providers: AiProvider[] = ["claude", "openai", "gemini"];
+    const result: Record<string, boolean> = {};
+    for (const p of providers) {
+      const key = await this._context.secrets.get(`gimmit.apiKey.${p}`);
+      result[p] = !!key;
+    }
+    return result as Record<AiProvider, boolean>;
+  }
+
+  private async _buildAiState(): Promise<AiState> {
+    return {
+      provider: this._getAiProvider(),
+      modelId: this._getAiModel(),
+      hasKey: await this._getAiKeyStatus(),
+    };
+  }
+
+  private async _sendAiState() {
+    if (!this._view) return;
+    const aiState = await this._buildAiState();
+    this._view.webview.postMessage({ command: "aiStateUpdate", aiState });
+  }
+
+  public async notifyAiStateChanged() {
+    await this._sendAiState();
+  }
+
+  // ── Webview ──
+
+  public async setRepoRoot(root: string | undefined) {
     if (root === this._repoRoot) return;
     this._repoRoot = root;
     this._stopWatcher();
     if (this._view) {
+      const aiState = await this._buildAiState();
       this._view.webview.html = root
-        ? getWebviewContent(getChangedFiles(root))
+        ? getWebviewContent(getChangedFiles(root), aiState)
         : getNoWorkspaceContent();
       if (root) this._startWatcher();
     }
   }
 
-  resolveWebviewView(
+  async resolveWebviewView(
     webviewView: vscode.WebviewView,
     _context: vscode.WebviewViewResolveContext,
     _token: vscode.CancellationToken
   ) {
     this._view = webviewView;
     webviewView.webview.options = { enableScripts: true };
+
+    const aiState = await this._buildAiState();
     webviewView.webview.html = this._repoRoot
-      ? getWebviewContent(getChangedFiles(this._repoRoot))
+      ? getWebviewContent(getChangedFiles(this._repoRoot), aiState)
       : getNoWorkspaceContent();
 
-    webviewView.webview.onDidReceiveMessage((msg) => {
-      if (msg.command === "refresh") this._refresh();
-    });
+    webviewView.webview.onDidReceiveMessage((msg) => this._handleMessage(msg));
 
     if (this._repoRoot) this._startWatcher();
     webviewView.onDidDispose(() => this._stopWatcher());
+  }
+
+  private async _handleMessage(msg: any) {
+    switch (msg.command) {
+      case "refresh":
+        this._refresh();
+        break;
+
+      case "setAiProvider":
+        await this._context.globalState.update("gimmit.aiProvider", msg.provider);
+        await this._sendAiState();
+        break;
+
+      case "setAiModel": {
+        const provider = this._getAiProvider();
+        if (provider !== "none") {
+          await this._context.globalState.update(`gimmit.aiModel.${provider}`, msg.modelId);
+          await this._sendAiState();
+        }
+        break;
+      }
+
+      case "manageApiKey":
+        if (msg.provider && msg.provider !== "none") {
+          await vscode.commands.executeCommand("gimmit.manageApiKey", msg.provider);
+        }
+        break;
+
+      case "aiGenerate":
+        await this._handleAiGenerate(msg);
+        break;
+    }
+  }
+
+  private async _handleAiGenerate(msg: any) {
+    if (!this._view || !this._repoRoot) return;
+    const provider = this._getAiProvider();
+    if (provider === "none") {
+      this._view.webview.postMessage({
+        command: "aiResult",
+        mode: msg.mode,
+        error: "No AI provider selected",
+      });
+      return;
+    }
+
+    const apiKey = await this._context.secrets.get(`gimmit.apiKey.${provider}`);
+    if (!apiKey) {
+      this._view.webview.postMessage({
+        command: "aiResult",
+        mode: msg.mode,
+        error: "No API key saved for " + provider,
+      });
+      return;
+    }
+
+    const modelId = this._getAiModel();
+    const filePaths: string[] = msg.filePaths || [];
+    const diff = getGitDiff(this._repoRoot, filePaths);
+
+    if (!diff && filePaths.length === 0) {
+      this._view.webview.postMessage({
+        command: "aiResult",
+        mode: msg.mode,
+        error: "No files selected",
+      });
+      return;
+    }
+
+    try {
+      const config: AiConfig = { provider, modelId, apiKey };
+      const request: AiGenerateRequest = {
+        diff,
+        fileList: filePaths,
+        commitType: msg.commitType || "feat",
+        scope: msg.scope || "",
+        mode: msg.mode,
+      };
+
+      const text = await generateWithAi(config, request);
+      this._view.webview.postMessage({
+        command: "aiResult",
+        mode: msg.mode,
+        text,
+      });
+    } catch (err: any) {
+      this._view.webview.postMessage({
+        command: "aiResult",
+        mode: msg.mode,
+        error: err.message || "AI generation failed",
+      });
+    }
   }
 
   private _refresh() {
@@ -1308,7 +1888,7 @@ export function activate(context: vscode.ExtensionContext) {
     ? getRepoRoot(vscode.window.activeTextEditor.document.uri.fsPath)
     : undefined;
 
-  const provider = new GitCommitViewProvider(initialRoot ?? activeEditorRoot);
+  const provider = new GitCommitViewProvider(initialRoot ?? activeEditorRoot, context);
 
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(
@@ -1349,6 +1929,72 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.commands.registerCommand("gimmit.open", () => {
       vscode.commands.executeCommand("gimmit.sidebar.focus");
+    })
+  );
+
+  // ── AI Key Management Commands ──
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand("gimmit.manageApiKey", async (preselectedProvider?: string) => {
+      const providers: { label: string; id: AiProvider }[] = [
+        { label: "Claude (Anthropic)", id: "claude" },
+        { label: "OpenAI", id: "openai" },
+        { label: "Gemini (Google)", id: "gemini" },
+      ];
+
+      let selectedProvider: AiProvider;
+
+      if (preselectedProvider && ["claude", "openai", "gemini"].includes(preselectedProvider)) {
+        selectedProvider = preselectedProvider as AiProvider;
+      } else {
+        const picked = await vscode.window.showQuickPick(
+          providers.map((p) => p.label),
+          { placeHolder: "Select AI provider to manage API key for" }
+        );
+        if (!picked) return;
+        selectedProvider = providers.find((p) => p.label === picked)!.id;
+      }
+
+      const existingKey = await context.secrets.get(`gimmit.apiKey.${selectedProvider}`);
+      const providerLabel = providers.find((p) => p.id === selectedProvider)!.label;
+
+      if (existingKey) {
+        const action = await vscode.window.showQuickPick(
+          ["Replace key", "Delete key", "Cancel"],
+          { placeHolder: `${providerLabel} — API key is saved. What would you like to do?` }
+        );
+        if (!action || action === "Cancel") return;
+
+        if (action === "Delete key") {
+          await context.secrets.delete(`gimmit.apiKey.${selectedProvider}`);
+          vscode.window.showInformationMessage(`Gimmit: ${providerLabel} API key deleted.`);
+          provider.notifyAiStateChanged();
+          return;
+        }
+      }
+
+      const key = await vscode.window.showInputBox({
+        prompt: `Enter your ${providerLabel} API key`,
+        placeHolder: "sk-...",
+        password: true,
+        ignoreFocusOut: true,
+        validateInput: (value) => {
+          if (!value || !value.trim()) return "API key cannot be empty";
+          return null;
+        },
+      });
+
+      if (key) {
+        await context.secrets.store(`gimmit.apiKey.${selectedProvider}`, key.trim());
+        vscode.window.showInformationMessage(`Gimmit: ${providerLabel} API key saved securely.`);
+        provider.notifyAiStateChanged();
+      }
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand("gimmit.setApiKey", () => {
+      vscode.commands.executeCommand("gimmit.manageApiKey");
     })
   );
 }

@@ -7,6 +7,7 @@ Generate clean, conventional commit messages directly from your changed files �
 <!-- Replace this GIF with a real demo -->
 <!-- ![gimmit demo](./media/demo.gif) -->
 🚧 Demo coming soon
+can run this
 > Select files → pick a commit type → copy a ready-to-run git command
 
 ## Why gimmit?

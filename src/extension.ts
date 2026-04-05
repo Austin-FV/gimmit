@@ -308,6 +308,8 @@ function getWebviewContent(files: ChangedFile[], aiState: AiState): string {
     align-items:center;
     justify-content:space-between;
     margin-bottom:4px;
+    flex-wrap:wrap;
+    gap:4px;
   }
   .section-label-row-right{display:flex;align-items:center;gap:8px}
   .toggle-btn{
@@ -465,12 +467,15 @@ function getWebviewContent(files: ChangedFile[], aiState: AiState): string {
   }
   .scope-input{
     flex:1;
+    min-width:0;
     background:transparent;
     border:none;
     color:var(--vscode-input-foreground);
     font-family:var(--vscode-font-family);
     font-size:11px;
     outline:none;
+    overflow:hidden;
+    text-overflow:ellipsis;
   }
   .scope-input::placeholder{color:var(--vscode-input-placeholderForeground)}
   .scope-clear{
@@ -491,6 +496,7 @@ function getWebviewContent(files: ChangedFile[], aiState: AiState): string {
     align-items:center;
     gap:4px;
     margin-bottom:4px;
+    flex-wrap:wrap;
   }
   .footer-select{
     background:var(--vscode-input-background);
@@ -515,7 +521,8 @@ function getWebviewContent(files: ChangedFile[], aiState: AiState): string {
     padding:4px 6px;
     outline:none;
     width:90px;
-    flex-shrink:0;
+    flex-shrink:1;
+    min-width:50px;
   }
   .footer-token-input:focus{border-color:var(--vscode-focusBorder)}
   .footer-value-input{
@@ -530,7 +537,7 @@ function getWebviewContent(files: ChangedFile[], aiState: AiState): string {
     width:100%;
   }
   .footer-value-input:focus{border-color:var(--vscode-focusBorder)}
-  .footer-value-wrap{position:relative;flex:1;min-width:0}
+  .footer-value-wrap{position:relative;flex:1;min-width:0;flex-basis:100px}
   .footer-val-counter{
     position:absolute;
     right:5px;top:50%;

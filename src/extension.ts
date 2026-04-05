@@ -653,6 +653,31 @@ function getWebviewContent(files: ChangedFile[], aiState: AiState): string {
     line-height:1.4;
   }
 
+  .undo-bar{
+    display:flex;
+    align-items:center;
+    gap:4px;
+    margin-top:6px;
+    font-size:10px;
+    color:var(--vscode-descriptionForeground);
+  }
+  .undo-check{color:var(--vscode-terminal-ansiGreen, #4ade80)}
+  .undo-link{
+    color:var(--vscode-textLink-foreground);
+    cursor:pointer;
+    background:none;
+    border:none;
+    font-family:var(--vscode-font-family);
+    font-size:10px;
+    padding:0;
+  }
+  .undo-link:hover{text-decoration:underline}
+  .undo-link:disabled{opacity:0.4;cursor:default;text-decoration:none}
+  .undo-timer{
+    color:var(--vscode-descriptionForeground);
+    opacity:0.5;
+  }
+
   .empty{
     display:flex;
     align-items:center;
@@ -940,7 +965,23 @@ function render() {
   if (!files.length) {
     root.innerHTML = '<div class="empty">No changed files.<br>Edits appear here automatically.</div>';
     const footer = document.getElementById('cmd-footer');
-    if (footer) footer.innerHTML = '';
+    if (footer) {
+      if (undoActive) {
+        footer.innerHTML =
+          '<div class="cmd-section">'+
+            '<div id="undoContainer">'+
+              '<div class="undo-bar">'+
+                '<span class="undo-check">✓</span>'+
+                '<span>Committed</span>'+
+                '<button class="undo-link" onclick="undoCommit()">undo</button>'+
+                '<span class="undo-timer" id="undoTimerText">'+undoSeconds+'s</span>'+
+              '</div>'+
+            '</div>'+
+          '</div>';
+      } else {
+        footer.innerHTML = '';
+      }
+    }
     return;
   }
 
@@ -1134,6 +1175,7 @@ function render() {
         '<div class="quick-links">'+
           '<a onclick="event.stopPropagation();selectAll()">all</a>'+
           '<a onclick="event.stopPropagation();selectNone()">none</a>'+
+          '<a onclick="event.stopPropagation();refreshFiles()" title="Refresh file list">↻</a>'+
         '</div>'
       : '')+
     '</div>'+
@@ -1180,6 +1222,16 @@ function render() {
         cmdHtml+
       '</div>'+
       '<div id="cmdError"></div>'+
+      '<div id="undoContainer">'+
+        (undoActive ?
+          '<div class="undo-bar">'+
+            '<span class="undo-check">✓</span>'+
+            '<span>Committed</span>'+
+            '<button class="undo-link" onclick="undoCommit()">undo</button>'+
+            '<span class="undo-timer" id="undoTimerText">'+undoSeconds+'s</span>'+
+          '</div>'
+        : '')+
+      '</div>'+
     '</div>';
 }
 
@@ -1255,6 +1307,10 @@ function selectNone() {
   userEditedMsg = false;
   userEditedBody = false;
   render();
+}
+
+function refreshFiles() {
+  vscode.postMessage({ command: 'refresh' });
 }
 
 function regenMsg() {
@@ -1346,6 +1402,7 @@ function runCmd() {
   if (btn) { btn.disabled = true; btn.textContent = 'Running…'; }
   const errBox = document.getElementById('cmdError');
   if (errBox) errBox.innerHTML = '';
+  clearUndo();
 
   vscode.postMessage({
     command: 'runGitCommand',
@@ -1356,6 +1413,58 @@ function runCmd() {
     breakingMsg: breakingMsg,
     footers: footers,
   });
+}
+
+// ── Undo ──
+let undoTimer = null;
+let undoCountdown = null;
+let undoSeconds = 15;
+let undoActive = false;
+
+function renderUndoBar() {
+  const container = document.getElementById('undoContainer');
+  if (!container || !undoActive) return;
+  container.innerHTML =
+    '<div class="undo-bar">'+
+      '<span class="undo-check">✓</span>'+
+      '<span>Committed</span>'+
+      '<button class="undo-link" onclick="undoCommit()">undo</button>'+
+      '<span class="undo-timer" id="undoTimerText">'+undoSeconds+'s</span>'+
+    '</div>';
+}
+
+function showUndo() {
+  clearUndo();
+  undoSeconds = 15;
+  undoActive = true;
+
+  renderUndoBar();
+  undoCountdown = setInterval(function(){
+    undoSeconds--;
+    if (undoSeconds <= 0) {
+      clearUndo();
+    } else {
+      const timer = document.getElementById('undoTimerText');
+      if (timer) timer.textContent = undoSeconds+'s';
+    }
+  }, 1000);
+
+  undoTimer = setTimeout(function(){ clearUndo(); }, 15000);
+}
+
+function clearUndo() {
+  undoActive = false;
+  if (undoTimer) { clearTimeout(undoTimer); undoTimer = null; }
+  if (undoCountdown) { clearInterval(undoCountdown); undoCountdown = null; }
+  const container = document.getElementById('undoContainer');
+  if (container) container.innerHTML = '';
+}
+
+function undoCommit() {
+  const container = document.getElementById('undoContainer');
+  const link = container ? container.querySelector('.undo-link') : null;
+  if (link) { link.disabled = true; link.textContent = 'undoing…'; }
+  vscode.postMessage({ command: 'undoCommit' });
 }
 
 function toggleFiles() {
@@ -1648,6 +1757,8 @@ window.addEventListener('message', e => {
         setTimeout(()=>{ btn.textContent='Run'; btn.classList.remove('ok'); }, 2500);
       }
       if (errBox) errBox.innerHTML = '';
+      // Show undo bar
+      showUndo();
       // Reset state after successful commit
       userEditedMsg = false;
       userEditedBody = false;
@@ -1657,8 +1768,21 @@ window.addEventListener('message', e => {
       breakingMsg = '';
       footers = [];
       customScope = '';
-      // Files will update via the watcher, but force a refresh
-      vscode.postMessage({ command: 'refresh' });
+      // File list will update via the backend refresh and watcher
+    }
+  } else if (data.command === 'undoResult') {
+    clearUndo();
+    const errBox = document.getElementById('cmdError');
+    if (data.error) {
+      if (errBox) errBox.innerHTML = '<div class="cmd-error">'+esc(data.error)+'</div>';
+    } else {
+      const btn = document.getElementById('runBtn');
+      if (btn) {
+        btn.textContent = 'Undone'; btn.classList.add('ok');
+        setTimeout(()=>{ btn.textContent='Run'; btn.classList.remove('ok'); }, 2000);
+      }
+      if (errBox) errBox.innerHTML = '';
+      // File list will update via the backend refresh and watcher
     }
   }
 });
@@ -1862,6 +1986,10 @@ class GitCommitViewProvider implements vscode.WebviewViewProvider {
       case "runGitCommand":
         this._handleRunGitCommand(msg);
         break;
+
+      case "undoCommit":
+        this._handleUndoCommit();
+        break;
     }
   }
 
@@ -1985,6 +2113,33 @@ class GitCommitViewProvider implements vscode.WebviewViewProvider {
       }
       this._view.webview.postMessage({
         command: "runResult",
+        error: errorMsg,
+      });
+    }
+  }
+
+  private _handleUndoCommit() {
+    if (!this._view || !this._repoRoot) return;
+
+    try {
+      execSync("git reset HEAD~1", {
+        cwd: this._repoRoot,
+        stdio: "pipe",
+      });
+
+      this._view.webview.postMessage({ command: "undoResult", success: true });
+
+      // Refresh file list
+      setTimeout(() => this._refresh(), 300);
+    } catch (err: any) {
+      let errorMsg = "Undo failed";
+      if (err.stderr) {
+        errorMsg = err.stderr.toString().trim();
+      } else if (err.message) {
+        errorMsg = err.message;
+      }
+      this._view.webview.postMessage({
+        command: "undoResult",
         error: errorMsg,
       });
     }

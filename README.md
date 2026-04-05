@@ -122,8 +122,14 @@ Supported tokens:
  
 ```
 src/
-├── extension.ts     # Main extension logic, webview, and sidebar provider
-└── ai-service.ts    # AI provider integrations (Claude, OpenAI, Gemini)
+├── extension.ts        # activate(), GitCommitViewProvider class
+├── ai-service.ts       # AI provider integrations (Claude, OpenAI, Gemini)
+├── git-utils.ts        # getChangedFiles(), getGitDiff(), getRepoRoot(), findRepoFromWorkspace()
+├── detection.ts        # CommitType, ChangedFile, detectChangeType(), patterns
+└── webview/
+    ├── content.ts      # getWebviewContent(), getNoWorkspaceContent()
+    ├── styles.ts       # CSS string export
+    └── script.ts       # Webview JS logic string export
 ```
 
 

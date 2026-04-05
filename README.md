@@ -13,7 +13,7 @@ Generate clean, conventional commit messages directly from your changed files �
 
 Writing conventional commits manually is slow and inconsistent.
 
-gimmit automates it by:
+Gimmit automates it by:
 - reading your changed files
 - suggesting the correct commit type
 - generating a ready-to-use command
@@ -35,9 +35,9 @@ gimmit automates it by:
 3. Open the **Gimmit** panel (activity bar)
 4. Select which files to include in the commit
 5. Choose a commit type — gimmit suggests one automatically
-6. Adjust the message if needed, or use **✦** to generate one with AI
+6. Adjust the message if needed, or use '**✦**' to generate one with AI
 7. Optionally add a body, footers, or mark as a breaking change
-8. Click **Run** to commit directly, or **Copy** to paste into your terminal
+8. Click '**Run**' to commit directly, or '**Copy**' to paste into your terminal
 
 Basic example:
 
@@ -65,7 +65,7 @@ Co-authored-by: Jane <jane@example.com>"
 
 ## AI Assist
  
-gimmit can use AI to generate commit messages and bodies based on your actual code changes (git diff). This is entirely optional — the extension works without it.
+Gimmit can use AI to generate commit messages and bodies based on your actual code changes (git diff). This is entirely optional — the extension works without it.
  
 ### Supported providers
  

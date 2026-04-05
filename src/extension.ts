@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { execSync } from "child_process";
+import { execSync, execFileSync } from "child_process";
 import * as path from "path";
 import * as fs from "fs";
 import {
@@ -901,7 +901,7 @@ function buildBody(selected) {
   const statusLabel = { M:'Modified', A:'Added', D:'Deleted', R:'Renamed', '?':'Untracked' };
   return selected.map(f => {
     const st = statusLabel[f.status] || 'Changed';
-    return '- ' + f.filepath + ' [' + st + ', ' + f.suggestedType + ']';
+    return '- ' + f.filepath + ' [' + st + ']';
   }).join(String.fromCharCode(10));
 }
 
@@ -2066,38 +2066,41 @@ class GitCommitViewProvider implements vscode.WebviewViewProvider {
     }
 
     try {
-      // Stage files
-      const paths = filePaths.map((f: string) => `"${f}"`).join(" ");
-      execSync(`git add ${paths}`, { cwd: this._repoRoot, stdio: "pipe" });
+      // Stage files — pass as array to avoid shell escaping issues
+      execFileSync("git", ["add", ...filePaths], {
+        cwd: this._repoRoot,
+        stdio: "pipe",
+      });
 
-      // Build commit args
-      const safeMsg = msg.commitMsg.replace(/"/g, '\\"');
-      const args = ['-m', `"${safeMsg}"`];
+      // Build commit args as array — execFileSync passes them directly,
+      // so newlines in body/footers are preserved correctly
+      const commitArgs: string[] = ["-m", msg.commitMsg];
 
       if (msg.commitBody && msg.commitBody.trim()) {
-        const safeBody = msg.commitBody.replace(/"/g, '\\"');
-        args.push('-m', `"${safeBody}"`);
+        commitArgs.push("-m", msg.commitBody);
       }
 
       // Build footer block
       const footerLines: string[] = [];
       if (msg.breakingChange && msg.breakingMsg && msg.breakingMsg.trim()) {
-        footerLines.push('BREAKING CHANGE: ' + msg.breakingMsg.replace(/"/g, '\\"'));
+        footerLines.push("BREAKING CHANGE: " + msg.breakingMsg);
       }
       if (msg.footers && msg.footers.length) {
         for (const f of msg.footers) {
-          const token = f.token === 'Custom' ? f.customToken : f.token;
+          const token = f.token === "Custom" ? f.customToken : f.token;
           if (token && token.trim() && f.value && f.value.trim()) {
-            footerLines.push(token + ': ' + f.value.replace(/"/g, '\\"'));
+            footerLines.push(token + ": " + f.value);
           }
         }
       }
       if (footerLines.length) {
-        args.push('-m', `"${footerLines.join('\n')}"`);
+        commitArgs.push("-m", footerLines.join("\n"));
       }
 
-      const commitCmd = `git commit ${args.join(' ')}`;
-      execSync(commitCmd, { cwd: this._repoRoot, stdio: "pipe" });
+      execFileSync("git", ["commit", ...commitArgs], {
+        cwd: this._repoRoot,
+        stdio: "pipe",
+      });
 
       this._view.webview.postMessage({ command: "runResult", success: true });
 

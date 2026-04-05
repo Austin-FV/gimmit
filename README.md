@@ -22,25 +22,22 @@ gimmit automates it by:
 
 ## Features
 
+- **Clean conventional commits** — properly formatted every time
+- **AI-powered messages** — optional AI generation for commit messages using Claude, OpenAI, or Gemini
 - **Live file tracking** — auto-updates from `git status`
 - **Smart commit suggestions** — based on file names and paths
-- **Clean conventional commits** — properly formatted every time
-- **Copy-ready commands** — `git add` + `git commit` in one click
-- **Body & footers support** — refs, co-authors, and more
-- **Breaking change handling** — automatic `!` + footer formatting
-- **Multi-repo support** — works across workspaces
-- **None mode** — generate plain commit messages when needed
+- **Run or copy commands** — execute `git add` + `git commit` directly from the sidebar, or copy to clipboard
 
 ## Usage
 
 1. Open a git repository in VS Code
 2. Make some changes to files
-3. Open the **gimmit** panel (activity bar)
+3. Open the **Gimmit** panel (activity bar)
 4. Select which files to include in the commit
 5. Choose a commit type — gimmit suggests one automatically
-6. Adjust the message if needed
+6. Adjust the message if needed, or use **✦** to generate one with AI
 7. Optionally add a body, footers, or mark as a breaking change
-8. Click **Copy** and paste the command into your terminal
+8. Click **Run** to commit directly, or **Copy** to paste into your terminal
 
 Basic example:
 
@@ -53,10 +50,42 @@ Advanced example (with body + footers):
 
 ```
 git add src/auth.ts
-git commit -m "feat(src)!: update auth endpoint" -m "- src/auth.ts [Modified, feat]" -m "BREAKING CHANGE: JWT tokens are now required
+git commit -m "feat(src)!: update auth endpoint" -m "- src/auth.ts [Modified]" -m "BREAKING CHANGE: JWT tokens are now required
 Refs: #42
 Co-authored-by: Jane <jane@example.com>"
 ```
+
+## Commands
+ 
+| Command | Description |
+|---------|-------------|
+| `Gimmit: Open` | Focus the gimmit sidebar panel |
+| `Gimmit: Set API Key` | Open the API key manager (provider picker → secure input) |
+| `Gimmit: Manage API Key` | Manage a specific provider's API key (replace or delete) |
+
+## AI Assist
+ 
+gimmit can use AI to generate commit messages and bodies based on your actual code changes (git diff). This is entirely optional — the extension works without it.
+ 
+### Supported providers
+ 
+| Provider | Models |
+|----------|--------|
+| Claude (Anthropic) | Sonnet 4, Haiku 4.5, Opus 4 |
+| OpenAI | GPT-4o Mini, GPT-4o, GPT-4.1 Nano, GPT-4.1 Mini, GPT-4.1 |
+| Gemini (Google) | 2.0 Flash, 2.5 Flash, 2.5 Pro |
+ 
+### Setup
+ 
+1. Open the **AI Assist** section in the gimmit sidebar
+2. Select a provider and model
+3. Click **manage** to set your API key (or run `Gimmit: Set API Key` from the command palette)
+4. API keys are stored securely in your OS keychain via VS Code's SecretStorage — never in settings files
+
+### Usage
+ 
+Once configured, a **✦** button appears inside the commit message and body input fields. Click it to generate content based on your selected files and their diffs. The AI writes only the description — the conventional commit prefix, scope, and type remain under your control.
+
 
 ## Commit Types
 
@@ -88,6 +117,15 @@ Supported tokens:
 
 - [Node.js](https://nodejs.org/) v18+
 - [VS Code](https://code.visualstudio.com/)
+
+### Project structure
+ 
+```
+src/
+├── extension.ts     # Main extension logic, webview, and sidebar provider
+└── ai-service.ts    # AI provider integrations (Claude, OpenAI, Gemini)
+```
+
 
 ### Run locally
 
@@ -132,6 +170,7 @@ You will need a Personal Access Token from [Azure DevOps](https://dev.azure.com)
 
 - Git must be installed and available in your system PATH
 - A workspace folder containing a git repository must be open
+- For AI features: an API key from at least one supported provider
 
 ## License
 

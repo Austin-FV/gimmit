@@ -970,7 +970,7 @@ function render() {
   const selected = files.filter(f => selectedPaths.has(f.filepath));
 
   if (!files.length) {
-    root.innerHTML = '<div class="empty">No changed files.<br>Edits appear here automatically.</div>';
+    root.innerHTML = '<div class="empty"><div>No changed files.<br>Edits appear here automatically.<br><a style="color:var(--vscode-textLink-foreground);cursor:pointer;font-size:11px;margin-top:6px;display:inline-block" onclick="refreshFiles()">↻ refresh</a></div></div>';
     const footer = document.getElementById('cmd-footer');
     if (footer) {
       if (undoActive) {
@@ -2161,6 +2161,10 @@ class GitCommitViewProvider implements vscode.WebviewViewProvider {
     this._view.webview.postMessage({ command: "updateFiles", files });
   }
 
+  public refresh() {
+    this._refresh();
+  }
+
   private _startWatcher() {
     if (!this._repoRoot) return;
     this._stopWatcher();
@@ -2218,12 +2222,20 @@ export function activate(context: vscode.ExtensionContext) {
     )
   );
 
-  // Switch repo when the user opens a file in a different git repo
+  // Switch repo when the user opens a file in a different git repo, and refresh file list
   context.subscriptions.push(
     vscode.window.onDidChangeActiveTextEditor(editor => {
       if (!editor || editor.document.uri.scheme !== "file") return;
       const root = getRepoRoot(editor.document.uri.fsPath);
       if (root) provider.setRepoRoot(root);
+      provider.refresh();
+    })
+  );
+
+  // Refresh file list when VS Code window regains focus
+  context.subscriptions.push(
+    vscode.window.onDidChangeWindowState(state => {
+      if (state.focused) provider.refresh();
     })
   );
 

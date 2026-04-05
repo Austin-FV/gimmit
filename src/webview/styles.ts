@@ -17,7 +17,7 @@ export function getStyles(): string {
   .header{margin-bottom:14px}
   .header h1{
     font-size:13px;
-    font-weight:600;
+    font-weight:700;
     color:var(--vscode-foreground);
     margin-bottom:2px;
   }

@@ -32,7 +32,7 @@ ${getStyles()}
 <div id="scrollable" style="flex:1;overflow-y:auto;padding:12px;overflow-x:hidden;display:flex;flex-direction:column">
 <div class="header">
   <h1>gimmit</h1>
-  <p>Select files · pick type · copy command</p>
+  <p>Select files · generate commit</p>
 </div>
 <div id="root" style="flex:1;display:flex;flex-direction:column"></div>
 </div>

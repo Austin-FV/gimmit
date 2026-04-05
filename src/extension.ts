@@ -1017,7 +1017,7 @@ function render() {
   const FOOTER_TOKENS = ['Refs', 'Closes', 'Fixes', 'Co-authored-by', 'Reviewed-by', 'See-also', 'Custom'];
 
   const aiBodyInline = isAiReady()
-    ? '<button class="ai-inline-btn body-ai-inline" id="aiBodyBtn" onclick="event.stopPropagation();aiGenerateBody()"'+(aiGeneratingBody?' disabled':'')+'>'+
+    ? '<button class="ai-inline-btn body-ai-inline" id="aiBodyBtn" title="Generate with AI" onclick="event.stopPropagation();aiGenerateBody()"'+(aiGeneratingBody?' disabled':'')+'>'+
         (aiGeneratingBody ? '<span class="ai-loading"></span>' : '<span class="ai-gen-spark">✦</span>')+
       '</button>'
     : '';
@@ -1148,7 +1148,7 @@ function render() {
 
   // ── AI inline button for commit message ──
   const aiMsgInline = isAiReady()
-    ? '<button class="ai-inline-btn" id="aiMsgBtn" onclick="event.stopPropagation();aiGenerateMsg()"'+(aiGeneratingMsg?' disabled':'')+'>'+
+    ? '<button class="ai-inline-btn" id="aiMsgBtn" title="Generate with AI" onclick="event.stopPropagation();aiGenerateMsg()"'+(aiGeneratingMsg?' disabled':'')+'>'+
         (aiGeneratingMsg ? '<span class="ai-loading"></span>' : '<span class="ai-gen-spark">✦</span>')+
       '</button>'
     : '';

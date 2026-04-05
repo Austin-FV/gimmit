@@ -71,9 +71,9 @@ gimmit can use AI to generate commit messages and bodies based on your actual co
  
 | Provider | Models |
 |----------|--------|
-| Claude (Anthropic) | Sonnet 4, Haiku 4.5, Opus 4 |
-| OpenAI | GPT-4o Mini, GPT-4o, GPT-4.1 Nano, GPT-4.1 Mini, GPT-4.1 |
-| Gemini (Google) | 2.0 Flash, 2.5 Flash, 2.5 Pro |
+| Claude (Anthropic) | Haiku 4.5, Sonnet 4.6, Opus 4.6 |
+| OpenAI | GPT-5 Nano, GPT-5.4 Nano |
+| Gemini (Google) | 2.5 Flash Lite, 3.1 Flash Lite Preview |
  
 ### Setup
  

@@ -195,24 +195,27 @@ async function callClaude(
 async function callOpenAI(
   apiKey: string,
   modelId: string,
-  prompt: string
+  prompt: string,
+  mode: "message" | "body" = "message"
 ): Promise<string> {
+  const isBody = mode === "body";
+
   const body = JSON.stringify({
     model: modelId,
-    messages: [
-      {
-        role: "system",
-        content:
-          "You are a precise commit message generator. Follow the user's instructions exactly.",
-      },
-      { role: "user", content: prompt },
-    ],
-    max_tokens: 1024,
-    temperature: 0.3,
+    instructions: isBody
+      ? "Generate only a concise git commit body. Plain text only. No title. No markdown. Keep it brief and directly tied to the changed files."
+      : "Generate only a conventional git commit title. Plain text only. No body. No markdown.",
+    input: prompt,
+    max_output_tokens: isBody ? 1024 : 400,
+    reasoning: { effort: "low" }, // try "none" if your chosen GPT-5 model supports it
+    text: {
+      format: { type: "text" },
+      verbosity: "low",
+    },
   });
 
   const response = await httpsRequest(
-    "https://api.openai.com/v1/chat/completions",
+    "https://api.openai.com/v1/responses",
     {
       method: "POST",
       headers: {
@@ -224,10 +227,35 @@ async function callOpenAI(
   );
 
   const parsed = JSON.parse(response);
-  if (parsed.choices && parsed.choices.length > 0) {
-    return parsed.choices[0].message.content.trim();
+
+  if (parsed.error) {
+    throw new Error(
+      `OpenAI API error: ${parsed.error.message || JSON.stringify(parsed.error)}`
+    );
   }
-  throw new Error("Empty response from OpenAI");
+
+  if (typeof parsed.output_text === "string" && parsed.output_text.trim()) {
+    return parsed.output_text.trim();
+  }
+
+  const text =
+    parsed.output
+      ?.filter((item: any) => item.type === "message")
+      ?.flatMap((item: any) => item.content || [])
+      ?.filter((c: any) => c.type === "output_text")
+      ?.map((c: any) => c.text)
+      ?.join("")
+      ?.trim();
+
+  if (text) return text;
+
+  if (parsed.status === "incomplete") {
+    throw new Error(
+      `OpenAI response incomplete: ${parsed.incomplete_details?.reason || "unknown"}`
+    );
+  }
+
+  throw new Error(`Unexpected OpenAI response: ${response}`);
 }
 
 async function callGemini(

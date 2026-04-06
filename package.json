@@ -1,10 +1,10 @@
 {
   "name": "gimmit",
   "displayName": "gimmit",
-  "description": "Generate conventional commit commands from your changed files.",
-  "version": "0.1.0",
+  "description": "Generate conventional commit commands from your changed files, with optional AI-powered messages.",
+  "version": "1.0.0",
   "engines": { "vscode": "^1.85.0" },
-  "categories": ["Other"],
+  "categories": ["SCM Providers"],
   "activationEvents": [],
   "main": "./out/extension.js",
   "contributes": {
@@ -52,7 +52,7 @@
     "@types/vscode": "^1.85.0",
     "typescript": "^5.3.0"
   },
-  "publisher": "your-publisher-id",
+  "publisher": "austinfv",
   "icon": "media/icon.png",
   "galleryBanner": {
     "color": "#0d0f14",

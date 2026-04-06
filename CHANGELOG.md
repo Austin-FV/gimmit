@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.0.0] - 2026-04-XX
+## [1.0.0] - 2026-04-06
 ### Added
 - Conventional commit message builder with type detection (feat, fix, docs, chore, refactor, style, test, perf, build, ci, none)
 - Live file tracking with auto-updates from git status

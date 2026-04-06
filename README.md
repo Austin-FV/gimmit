@@ -1,7 +1,7 @@
 # gimmit
-
 Generate clean, conventional commit messages directly from your changed files — without leaving VS Code.
 
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 ## Demo
 
 <!-- Replace this GIF with a real demo -->
@@ -155,13 +155,13 @@ Recompiles automatically on every save.
 ```bash
 npm install -g @vscode/vsce
 vsce package
-# produces gimmit-0.1.0.vsix
+# produces gimmit-1.0.0.vsix
 ```
 
 Install a `.vsix` locally:
 
 ```bash
-code --install-extension gimmit-0.1.0.vsix
+code --install-extension gimmit-1.0.0.vsix
 ```
 
 Publish to the marketplace:
@@ -180,4 +180,6 @@ You will need a Personal Access Token from [Azure DevOps](https://dev.azure.com)
 
 ## License
 
-MIT
+This project is licensed under the **MIT License**.
+
+See the [LICENSE](LICENSE) file for details.

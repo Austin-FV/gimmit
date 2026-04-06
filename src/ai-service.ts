@@ -3,7 +3,8 @@ import * as http from "http";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type AiProvider = "claude" | "openai" | "gemini";
+export type AiProvider = "anthropic" | "openai" | "google";
+export type AiProviderOption = AiProvider | "none";
 
 export interface AiModel {
   id: string;
@@ -25,34 +26,53 @@ export interface AiGenerateRequest {
   mode: "message" | "body";
 }
 
+// ─── Provider Metadata ───────────────────────────────────────────────────────
+
+export const AI_PROVIDERS: AiProvider[] = ["anthropic", "openai", "google"];
+
+export const PROVIDER_LABELS: Record<AiProvider, string> = {
+  anthropic: "Anthropic",
+  openai: "OpenAI",
+  google: "Google",
+};
+
+export function normalizeAiProvider(provider: string | undefined | null): AiProviderOption {
+  if (!provider || provider === "none") return "none";
+  return AI_PROVIDERS.includes(provider as AiProvider) ? (provider as AiProvider) : "none";
+}
+
 // ─── Available Models ─────────────────────────────────────────────────────────
 
 export const PROVIDER_MODELS: Record<AiProvider, AiModel[]> = {
-  claude: [
-    { id: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5", provider: "claude" },
-    { id: "claude-sonnet-4-6", label: "Claude Sonnet 4.6", provider: "claude" },
-    { id: "claude-opus-4-6", label: "Claude Opus 4.6", provider: "claude" },
+  anthropic: [
+    { id: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5", provider: "anthropic" },
+    { id: "claude-sonnet-4-6", label: "Claude Sonnet 4.6", provider: "anthropic" },
+    { id: "claude-opus-4-6", label: "Claude Opus 4.6", provider: "anthropic" },
   ],
   openai: [
     { id: "gpt-5-nano", label: "GPT-5 Nano", provider: "openai" },
     { id: "gpt-5.4-nano", label: "GPT-5.4 Nano", provider: "openai" },
   ],
-  gemini: [
-    { id: "gemini-2.5-flash-lite", label: "Gemini 2.5 Flash Lite", provider: "gemini" },
-    { id: "gemini-3.1-flash-lite-preview", label: "Gemini 3.1 Flash Lite Preview", provider: "gemini" },
+  google: [
+    { id: "gemini-2.5-flash-lite", label: "Gemini 2.5 Flash Lite", provider: "google" },
+    { id: "gemini-3.1-flash-lite-preview", label: "Gemini 3.1 Flash Lite Preview", provider: "google" },
   ],
 };
 
 export function getAllModels(): AiModel[] {
   return [
-    ...PROVIDER_MODELS.claude,
+    ...PROVIDER_MODELS.anthropic,
     ...PROVIDER_MODELS.openai,
-    ...PROVIDER_MODELS.gemini,
+    ...PROVIDER_MODELS.google,
   ];
 }
 
 export function getDefaultModel(provider: AiProvider): string {
   return PROVIDER_MODELS[provider][0].id;
+}
+
+export function getProviderLabel(provider: AiProvider): string {
+  return PROVIDER_LABELS[provider];
 }
 
 // ─── Prompts ──────────────────────────────────────────────────────────────────
@@ -157,7 +177,7 @@ function httpsRequest(
 
 // ─── Provider Implementations ─────────────────────────────────────────────────
 
-async function callClaude(
+async function callAnthropic(
   apiKey: string,
   modelId: string,
   prompt: string
@@ -189,7 +209,7 @@ async function callClaude(
       .join("")
       .trim();
   }
-  throw new Error("Empty response from Claude");
+  throw new Error("Empty response from Anthropic");
 }
 
 async function callOpenAI(
@@ -207,7 +227,7 @@ async function callOpenAI(
       : "Generate only a conventional git commit title. Plain text only. No body. No markdown.",
     input: prompt,
     max_output_tokens: isBody ? 1024 : 400,
-    reasoning: { effort: "low" }, // try "none" if your chosen GPT-5 model supports it
+    reasoning: { effort: "low" },
     text: {
       format: { type: "text" },
       verbosity: "low",
@@ -258,7 +278,7 @@ async function callOpenAI(
   throw new Error(`Unexpected OpenAI response: ${response}`);
 }
 
-async function callGemini(
+async function callGoogle(
   apiKey: string,
   modelId: string,
   prompt: string
@@ -295,7 +315,7 @@ async function callGemini(
       .join("")
       .trim();
   }
-  throw new Error("Empty response from Gemini");
+  throw new Error("Empty response from Google");
 }
 
 // ─── Unified Generate Function ───────────────────────────────────────────────
@@ -310,12 +330,12 @@ export async function generateWithAi(
       : buildBodyPrompt(request);
 
   switch (config.provider) {
-    case "claude":
-      return callClaude(config.apiKey, config.modelId, prompt);
+    case "anthropic":
+      return callAnthropic(config.apiKey, config.modelId, prompt);
     case "openai":
-      return callOpenAI(config.apiKey, config.modelId, prompt);
-    case "gemini":
-      return callGemini(config.apiKey, config.modelId, prompt);
+      return callOpenAI(config.apiKey, config.modelId, prompt, request.mode);
+    case "google":
+      return callGoogle(config.apiKey, config.modelId, prompt);
     default:
       throw new Error(`Unknown provider: ${config.provider}`);
   }

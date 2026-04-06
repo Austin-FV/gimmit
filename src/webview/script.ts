@@ -294,9 +294,9 @@ function render() {
   '</div>';
 
   // ── AI settings panel ──
-  const providerOpts = ['none','claude','openai','gemini'].map(p =>
+  const providerOpts = ['none','anthropic','openai','google'].map(p =>
     '<option value="'+p+'"'+(aiState.provider===p?' selected':'')+'>'+
-      (p==='none' ? 'Disabled' : p.charAt(0).toUpperCase()+p.slice(1))+
+      (p==='none' ? 'Disabled' : ({ anthropic: 'Anthropic', openai: 'OpenAI', google: 'Google' }[p] || p))+
     '</option>'
   ).join('');
 

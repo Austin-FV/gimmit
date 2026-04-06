@@ -3,11 +3,15 @@ import { execSync, execFileSync } from "child_process";
 import * as path from "path";
 import * as fs from "fs";
 import {
+  AI_PROVIDERS,
   AiProvider,
+  AiProviderOption,
   AiConfig,
   AiGenerateRequest,
   getDefaultModel,
   generateWithAi,
+  getProviderLabel,
+  normalizeAiProvider,
 } from "./ai-service";
 import { getChangedFiles, getGitDiff, getRepoRoot, findRepoFromWorkspace } from "./git-utils";
 import { AiState, getWebviewContent, getNoWorkspaceContent } from "./webview/content";
@@ -28,35 +32,51 @@ class GitCommitViewProvider implements vscode.WebviewViewProvider {
     this._context = context;
   }
 
-  // ── AI State Helpers ──
-
-  private _getAiProvider(): AiProvider | "none" {
-    return this._context.globalState.get<AiProvider | "none">("gimmit.aiProvider", "none");
+  private _getAiProvider(): AiProviderOption {
+    const storedProvider = this._context.globalState.get<string>("gimmit.aiProvider", "none");
+    return normalizeAiProvider(storedProvider);
   }
 
-  private _getAiModel(): string {
+  private async _setAiProvider(provider: AiProviderOption) {
+    await this._context.globalState.update("gimmit.aiProvider", provider);
+  }
+
+  private async _getStoredModel(provider: AiProvider): Promise<string | undefined> {
+    return this._context.globalState.get<string>(`gimmit.aiModel.${provider}`);
+  }
+
+  private async _getAiModel(): Promise<string> {
     const provider = this._getAiProvider();
     if (provider === "none") return "";
-    return this._context.globalState.get<string>(
-      `gimmit.aiModel.${provider}`,
-      getDefaultModel(provider)
-    );
+
+    const storedModel = await this._getStoredModel(provider);
+    return storedModel || getDefaultModel(provider);
+  }
+
+  private async _setAiModel(provider: AiProvider, modelId: string) {
+    await this._context.globalState.update(`gimmit.aiModel.${provider}`, modelId);
+  }
+
+  public async getApiKey(provider: AiProvider): Promise<string | undefined> {
+    return this._context.secrets.get(`gimmit.apiKey.${provider}`);
+  }
+
+  public async deleteApiKey(provider: AiProvider) {
+    await this._context.secrets.delete(`gimmit.apiKey.${provider}`);
   }
 
   private async _getAiKeyStatus(): Promise<Record<AiProvider, boolean>> {
-    const providers: AiProvider[] = ["claude", "openai", "gemini"];
-    const result: Record<string, boolean> = {};
-    for (const p of providers) {
-      const key = await this._context.secrets.get(`gimmit.apiKey.${p}`);
-      result[p] = !!key;
+    const result = {} as Record<AiProvider, boolean>;
+    for (const provider of AI_PROVIDERS) {
+      result[provider] = !!(await this.getApiKey(provider));
     }
-    return result as Record<AiProvider, boolean>;
+    return result;
   }
 
   private async _buildAiState(): Promise<AiState> {
     return {
       provider: this._getAiProvider(),
-      modelId: this._getAiModel(),
+      modelId: await this._getAiModel(),
       hasKey: await this._getAiKeyStatus(),
     };
   }
@@ -113,25 +133,29 @@ class GitCommitViewProvider implements vscode.WebviewViewProvider {
         this._refresh();
         break;
 
-      case "setAiProvider":
-        await this._context.globalState.update("gimmit.aiProvider", msg.provider);
+      case "setAiProvider": {
+        const provider = normalizeAiProvider(msg.provider);
+        await this._setAiProvider(provider);
         await this._sendAiState();
         break;
+      }
 
       case "setAiModel": {
         const provider = this._getAiProvider();
         if (provider !== "none") {
-          await this._context.globalState.update(`gimmit.aiModel.${provider}`, msg.modelId);
+          await this._setAiModel(provider, msg.modelId);
           await this._sendAiState();
         }
         break;
       }
 
-      case "manageApiKey":
-        if (msg.provider && msg.provider !== "none") {
-          await vscode.commands.executeCommand("gimmit.manageApiKey", msg.provider);
+      case "manageApiKey": {
+        const provider = normalizeAiProvider(msg.provider);
+        if (provider !== "none") {
+          await vscode.commands.executeCommand("gimmit.manageApiKey", provider);
         }
         break;
+      }
 
       case "aiGenerate":
         await this._handleAiGenerate(msg);
@@ -161,17 +185,17 @@ class GitCommitViewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
-    const apiKey = await this._context.secrets.get(`gimmit.apiKey.${provider}`);
+    const apiKey = await this.getApiKey(provider);
     if (!apiKey) {
       this._view.webview.postMessage({
         command: "aiResult",
         mode: msg.mode,
-        error: "No API key saved for " + provider,
+        error: `No API key saved for ${getProviderLabel(provider)}`,
       });
       return;
     }
 
-    const modelId = this._getAiModel();
+    const modelId = await this._getAiModel();
     const filePaths: string[] = msg.filePaths || [];
     const diff = getGitDiff(this._repoRoot, filePaths);
 
@@ -231,7 +255,7 @@ class GitCommitViewProvider implements vscode.WebviewViewProvider {
       });
 
       // Build commit args as array — execFileSync passes them directly,
-      // so newlines in body/footers are preserved correctly
+      // newlines in body/footers are preserved correctly
       const commitArgs: string[] = ["-m", msg.commitMsg];
 
       if (msg.commitBody && msg.commitBody.trim()) {
@@ -334,7 +358,7 @@ class GitCommitViewProvider implements vscode.WebviewViewProvider {
       this._watcher = fs.watch(gitDir, { recursive: false }, (_, filename) => {
         if (filename === "index" || filename === "HEAD" || filename === "MERGE_HEAD") trigger();
       });
-    } catch { /* fs.watch not available on all platforms */ }
+    } catch {}
 
     this._disposables.push(
       vscode.workspace.onDidSaveTextDocument(() => trigger()),
@@ -421,16 +445,16 @@ export function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(
     vscode.commands.registerCommand("gimmit.manageApiKey", async (preselectedProvider?: string) => {
-      const providers: { label: string; id: AiProvider }[] = [
-        { label: "Claude (Anthropic)", id: "claude" },
-        { label: "OpenAI", id: "openai" },
-        { label: "Gemini (Google)", id: "gemini" },
-      ];
+      const providers: { label: string; id: AiProvider }[] = AI_PROVIDERS.map((providerId) => ({
+        label: getProviderLabel(providerId),
+        id: providerId,
+      }));
 
       let selectedProvider: AiProvider;
+      const normalizedPreselectedProvider = normalizeAiProvider(preselectedProvider);
 
-      if (preselectedProvider && ["claude", "openai", "gemini"].includes(preselectedProvider)) {
-        selectedProvider = preselectedProvider as AiProvider;
+      if (normalizedPreselectedProvider !== "none") {
+        selectedProvider = normalizedPreselectedProvider;
       } else {
         const picked = await vscode.window.showQuickPick(
           providers.map((p) => p.label),
@@ -440,8 +464,8 @@ export function activate(context: vscode.ExtensionContext) {
         selectedProvider = providers.find((p) => p.label === picked)!.id;
       }
 
-      const existingKey = await context.secrets.get(`gimmit.apiKey.${selectedProvider}`);
-      const providerLabel = providers.find((p) => p.id === selectedProvider)!.label;
+      const existingKey = await provider.getApiKey(selectedProvider);
+      const providerLabel = getProviderLabel(selectedProvider);
 
       if (existingKey) {
         const action = await vscode.window.showQuickPick(
@@ -451,7 +475,7 @@ export function activate(context: vscode.ExtensionContext) {
         if (!action || action === "Cancel") return;
 
         if (action === "Delete key") {
-          await context.secrets.delete(`gimmit.apiKey.${selectedProvider}`);
+          await provider.deleteApiKey(selectedProvider);
           vscode.window.showInformationMessage(`Gimmit: ${providerLabel} API key deleted.`);
           provider.notifyAiStateChanged();
           return;

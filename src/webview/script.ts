@@ -29,7 +29,7 @@ let breakingChange = false;
 let breakingMsg = '';
 let footers = []; // [{id, token, customToken, value}]
 let customScope = '';
-let commitMsg  = buildMsg(files.filter(f => selectedPaths.has(f.filepath)), commitType);
+let commitMsg  = buildDesc(files.filter(f => selectedPaths.has(f.filepath)), commitType);
 
 // ── AI state ──
 const AI_MODELS = ${modelsJson};
@@ -51,46 +51,61 @@ function inferDominantType(fs) {
   return Object.entries(c).sort((a,b)=>b[1]-a[1])[0][0];
 }
 
-function buildMsg(selected, type) {
+function buildDesc(selected, type) {
   if (!selected.length) return '';
+  const names = selected.map(f => f.filepath.split('/').pop().replace(/\.[^.]+$/, ''));
 
-  // None mode — no conventional commits prefix
+  // None mode — plain description
   if (type === 'none') {
-    const names = selected.map(f => f.filepath.split('/').pop().replace(/\.[^.]+$/, ''));
     if (names.length === 1) return 'update ' + names[0];
     if (names.length <= 3)  return 'update ' + names.join(', ');
     return 'update ' + names.slice(0, 2).join(', ') + ' and ' + (names.length - 2) + ' more files';
   }
 
-  const scope = customScope;
-  const names = selected.map(f => f.filepath.split('/').pop().replace(/\.[^.]+$/, ''));
-  let desc;
   if (names.length === 1) {
     const n = names[0];
-    if (type==='fix')           desc='fix issue in '+n;
-    else if (type==='docs')     desc='update '+n+' documentation';
-    else if (type==='test')     desc='add tests for '+n;
-    else if (type==='chore')    desc='update '+n+' config';
-    else if (type==='style')    desc='update '+n+' styles';
-    else if (type==='refactor') desc='refactor '+n;
-    else if (type==='perf')     desc='improve performance of '+n;
-    else if (type==='build')    desc='update '+n+' build config';
-    else if (type==='ci')       desc='update '+n+' CI config';
-    else                        desc='add '+n;
-  } else {
-    if (type==='fix')           desc='fix issues across '+names.length+' files';
-    else if (type==='docs')     desc='update documentation';
-    else if (type==='test')     desc='add/update tests';
-    else if (type==='chore')    desc='update config files';
-    else if (type==='style')    desc='update styles';
-    else if (type==='refactor') desc='refactor '+names.length+' files';
-    else if (type==='perf')     desc='improve performance across '+names.length+' files';
-    else if (type==='build')    desc='update build configuration';
-    else if (type==='ci')       desc='update CI configuration';
-    else                        desc='update '+names.length+' files';
+    if (type==='fix')           return 'fix issue in '+n;
+    if (type==='docs')          return 'update '+n+' documentation';
+    if (type==='test')          return 'add tests for '+n;
+    if (type==='chore')         return 'update '+n+' config';
+    if (type==='style')         return 'update '+n+' styles';
+    if (type==='refactor')      return 'refactor '+n;
+    if (type==='perf')          return 'improve performance of '+n;
+    if (type==='build')         return 'update '+n+' build config';
+    if (type==='ci')            return 'update '+n+' CI config';
+    return 'add '+n;
   }
-  const prefix = type + (scope ? '('+scope+')' : '');
-  return (breakingChange ? prefix + '!' : prefix) + ': ' + desc;
+  if (type==='fix')           return 'fix issues across '+names.length+' files';
+  if (type==='docs')          return 'update documentation';
+  if (type==='test')          return 'add/update tests';
+  if (type==='chore')         return 'update config files';
+  if (type==='style')         return 'update styles';
+  if (type==='refactor')      return 'refactor '+names.length+' files';
+  if (type==='perf')          return 'improve performance across '+names.length+' files';
+  if (type==='build')         return 'update build configuration';
+  if (type==='ci')            return 'update CI configuration';
+  return 'update '+names.length+' files';
+}
+
+// Compute the conventional commit prefix from current state.
+// Returns '' for none mode, otherwise "type(scope): " or "type(scope)!: ".
+function getPrefix() {
+  if (commitType === 'none') return '';
+  const base = commitType + (customScope ? '(' + customScope + ')' : '');
+  return (breakingChange ? base + '!' : base) + ': ';
+}
+
+// Full commit message string for display and commands.
+function getFullMsg() {
+  return getPrefix() + commitMsg;
+}
+
+// Regenerate the description from the current file selection,
+// but only if the user hasn't manually edited it.
+function regenIfNeeded() {
+  if (!userEditedMsg) {
+    commitMsg = buildDesc(files.filter(f => selectedPaths.has(f.filepath)), commitType);
+  }
 }
 
 function buildBody(selected) {
@@ -209,7 +224,8 @@ function render() {
     '</div>';
   }).join('');
 
-  const cmd = buildCmd(selected, commitMsg, showBody ? commitBody : '', breakingChange, breakingMsg, footers);
+  const fullMsg = getFullMsg();
+  const cmd = buildCmd(selected, fullMsg, showBody ? commitBody : '', breakingChange, breakingMsg, footers);
   const cmdHtml = cmd ? highlightCmd(cmd) : '<span class="cp" style="opacity:0.4">select files above</span>';
 
   const FOOTER_TOKENS = ['Refs', 'Closes', 'Fixes', 'Co-authored-by', 'Reviewed-by', 'See-also', 'Custom'];
@@ -384,12 +400,10 @@ function render() {
         (userEditedMsg ? '<button class="reset-link" id="msgResetBtn" onclick="regenMsg()">↺ reset</button>' : '')+
       '</div>'+
       (commitType !== 'none' ? (()=>{
-        const colonIdx = commitMsg.indexOf(': ');
-        const msgPrefix = colonIdx >= 0 ? commitMsg.slice(0, colonIdx + 1) : commitMsg;
-        const msgDesc   = colonIdx >= 0 ? commitMsg.slice(colonIdx + 2) : '';
+        const prefixDisplay = getPrefix().slice(0, -1); // "type(scope):" without trailing space
         return '<div class="msg-input-row" id="msgInputRow">'+
-          '<span class="msg-prefix" id="msgPrefix">'+esc(msgPrefix)+'</span>'+
-          '<input class="msg-desc-input" id="msgDesc" type="text" value="'+esc(msgDesc)+'" oninput="onDescEdit(this.value)"/>'+
+          '<span class="msg-prefix" id="msgPrefix">'+esc(prefixDisplay)+'</span>'+
+          '<input class="msg-desc-input" id="msgDesc" type="text" value="'+esc(commitMsg)+'" oninput="onDescEdit(this.value)"/>'+
           aiMsgInline+
         '</div>';
       })() :
@@ -398,8 +412,8 @@ function render() {
           aiMsgInline+
         '</div>'
       )+
-      '<div class="char-counter '+(commitMsg.length > 72 ? 'over' : '')+'" id="charCounter">'+
-        commitMsg.length+' / 72'+
+      '<div class="char-counter '+(fullMsg.length > 72 ? 'over' : '')+'" id="charCounter">'+
+        fullMsg.length+' / 72'+
       '</div>'+
       (aiMsgError ? '<div class="ai-err" id="aiMsgErr">'+esc(aiMsgError)+'</div>' : '')+
     '</div>'+
@@ -439,38 +453,8 @@ function render() {
 }
 
 function setType(t) {
-  const prevType = commitType;
   commitType = t;
-
-  if (t === 'none') {
-    if (userEditedMsg) {
-      // Strip the conventional prefix — keep only the description
-      const colonIdx = commitMsg.indexOf(': ');
-      if (colonIdx >= 0) commitMsg = commitMsg.slice(colonIdx + 2);
-    } else {
-      // No custom edit — regenerate as plain message
-      commitMsg = buildMsg(files.filter(f => selectedPaths.has(f.filepath)), commitType);
-    }
-  } else if (prevType === 'none' && userEditedMsg) {
-    // Carry the none message as the description under the new prefix
-    const newMsg = buildMsg(files.filter(f => selectedPaths.has(f.filepath)), commitType);
-    const newColonIdx = newMsg.indexOf(': ');
-    const newPrefix = newColonIdx >= 0 ? newMsg.slice(0, newColonIdx + 2) : '';
-    commitMsg = newPrefix + commitMsg;
-  } else if (prevType === 'none' && !userEditedMsg) {
-    // No custom edit — regenerate fully
-    commitMsg = buildMsg(files.filter(f => selectedPaths.has(f.filepath)), commitType);
-  } else {
-    // Switching between conventional types — keep user's description, update prefix only
-    const colonIdx = commitMsg.indexOf(': ');
-    const currentDesc = userEditedMsg && colonIdx >= 0 ? commitMsg.slice(colonIdx + 2) : null;
-    commitMsg = buildMsg(files.filter(f => selectedPaths.has(f.filepath)), commitType);
-    if (currentDesc !== null) {
-      const newColonIdx = commitMsg.indexOf(': ');
-      const newPrefix = newColonIdx >= 0 ? commitMsg.slice(0, newColonIdx + 2) : '';
-      commitMsg = newPrefix + currentDesc;
-    }
-  }
+  regenIfNeeded();
 
   if (showBody && !userEditedBody) {
     commitBody = buildBody(files.filter(f => selectedPaths.has(f.filepath)));
@@ -481,18 +465,7 @@ function setType(t) {
 function toggleFile(fp) {
   if (selectedPaths.has(fp)) selectedPaths.delete(fp);
   else selectedPaths.add(fp);
-  if (commitType !== 'none') {
-    const colonIdx = commitMsg.indexOf(': ');
-    const currentDesc = userEditedMsg && colonIdx >= 0 ? commitMsg.slice(colonIdx + 2) : null;
-    commitMsg = buildMsg(files.filter(f => selectedPaths.has(f.filepath)), commitType);
-    if (currentDesc !== null) {
-      const newColonIdx = commitMsg.indexOf(': ');
-      const newPrefix = newColonIdx >= 0 ? commitMsg.slice(0, newColonIdx + 2) : '';
-      commitMsg = newPrefix + currentDesc;
-    }
-  } else if (!userEditedMsg) {
-    commitMsg = buildMsg(files.filter(f => selectedPaths.has(f.filepath)), commitType);
-  }
+  regenIfNeeded();
   if (showBody && !userEditedBody) commitBody = buildBody(files.filter(f => selectedPaths.has(f.filepath)));
   render();
 }
@@ -519,7 +492,7 @@ function refreshFiles() {
 function regenMsg() {
   userEditedMsg = false;
   aiMsgError = '';
-  commitMsg = buildMsg(files.filter(f => selectedPaths.has(f.filepath)), commitType);
+  commitMsg = buildDesc(files.filter(f => selectedPaths.has(f.filepath)), commitType);
   render();
 }
 
@@ -540,13 +513,12 @@ function onDescEdit(val) {
       row.appendChild(btn);
     }
   }
-  const colonIdx = commitMsg.indexOf(': ');
-  const prefix = colonIdx >= 0 ? commitMsg.slice(0, colonIdx + 2) : '';
-  commitMsg = prefix + val;
+  commitMsg = val;
+  const full = getFullMsg();
   const counter = document.getElementById('charCounter');
   if (counter) {
-    counter.textContent = commitMsg.length + ' / 72';
-    counter.className = 'char-counter' + (commitMsg.length > 72 ? ' over' : '');
+    counter.textContent = full.length + ' / 72';
+    counter.className = 'char-counter' + (full.length > 72 ? ' over' : '');
   }
   refreshCmd();
 }
@@ -570,13 +542,14 @@ function onMsgEdit(val) {
     }
   }
   commitMsg = val;
+  const full = getFullMsg();
   const counter = document.getElementById('charCounter');
   if (counter) {
-    counter.textContent = val.length + ' / 72';
-    counter.className = 'char-counter' + (val.length > 72 ? ' over' : '');
+    counter.textContent = full.length + ' / 72';
+    counter.className = 'char-counter' + (full.length > 72 ? ' over' : '');
   }
   const sel = files.filter(f => selectedPaths.has(f.filepath));
-  const cmd = buildCmd(sel, val, showBody ? commitBody : '', breakingChange, breakingMsg, footers);
+  const cmd = buildCmd(sel, full, showBody ? commitBody : '', breakingChange, breakingMsg, footers);
   const box = document.getElementById('cmdBox');
   if (box) {
     box.innerHTML = (cmd ? highlightCmd(cmd) : '<span class="cp" style="opacity:0.4">select files above</span>');
@@ -585,7 +558,7 @@ function onMsgEdit(val) {
 
 function copyCmd() {
   const sel = files.filter(f => selectedPaths.has(f.filepath));
-  const cmd = buildCmd(sel, commitMsg, showBody ? commitBody : '', breakingChange, breakingMsg, footers);
+  const cmd = buildCmd(sel, getFullMsg(), showBody ? commitBody : '', breakingChange, breakingMsg, footers);
   if (!cmd) return;
   navigator.clipboard.writeText(cmd).then(() => {
     const btn = document.getElementById('copyBtn');
@@ -598,7 +571,7 @@ function copyCmd() {
 
 function runCmd() {
   const sel = files.filter(f => selectedPaths.has(f.filepath));
-  const cmd = buildCmd(sel, commitMsg, showBody ? commitBody : '', breakingChange, breakingMsg, footers);
+  const cmd = buildCmd(sel, getFullMsg(), showBody ? commitBody : '', breakingChange, breakingMsg, footers);
   if (!cmd) return;
 
   const btn = document.getElementById('runBtn');
@@ -610,7 +583,7 @@ function runCmd() {
   vscode.postMessage({
     command: 'runGitCommand',
     filePaths: sel.map(f => f.filepath),
-    commitMsg: commitMsg,
+    commitMsg: getFullMsg(),
     commitBody: showBody ? commitBody : '',
     breakingChange: breakingChange,
     breakingMsg: breakingMsg,
@@ -720,7 +693,7 @@ function onBodyEdit(val) {
     counter.className = 'body-counter' + (longest > 72 ? ' over' : '');
   }
   const sel = files.filter(f => selectedPaths.has(f.filepath));
-  const cmd = buildCmd(sel, commitMsg, val, breakingChange, breakingMsg, footers);
+  const cmd = buildCmd(sel, getFullMsg(), val, breakingChange, breakingMsg, footers);
   const box = document.getElementById('cmdBox');
   if (box) {
     box.innerHTML = (cmd ? highlightCmd(cmd) : '<span class="cp" style="opacity:0.4">select files above</span>');
@@ -730,16 +703,14 @@ function onBodyEdit(val) {
 function toggleBreaking() {
   breakingChange = !breakingChange;
   if (!breakingChange) breakingMsg = '';
-  if (!userEditedMsg) {
-    commitMsg = buildMsg(files.filter(f => selectedPaths.has(f.filepath)), commitType);
-  }
+  regenIfNeeded();
   render();
 }
 
 function onBreakingEdit(val) {
   breakingMsg = val;
   const sel = files.filter(f => selectedPaths.has(f.filepath));
-  const cmd = buildCmd(sel, commitMsg, showBody ? commitBody : '', true, val, footers);
+  const cmd = buildCmd(sel, getFullMsg(), showBody ? commitBody : '', true, val, footers);
   const box = document.getElementById('cmdBox');
   if (box) {
     box.innerHTML = (cmd ? highlightCmd(cmd) : '<span class="cp" style="opacity:0.4">select files above</span>');
@@ -785,36 +756,23 @@ function updateFooterValue(idx, val) {
 function onScopeEdit(val) {
   customScope = val;
   if (commitType !== 'none') {
-    // Keep user's description if they edited it, only rebuild prefix
-    const colonIdx = commitMsg.indexOf(': ');
-    const currentDesc = userEditedMsg && colonIdx >= 0 ? commitMsg.slice(colonIdx + 2) : null;
-    commitMsg = buildMsg(files.filter(f => selectedPaths.has(f.filepath)), commitType);
-    if (currentDesc !== null) {
-      const newColonIdx = commitMsg.indexOf(': ');
-      const newPrefix = newColonIdx >= 0 ? commitMsg.slice(0, newColonIdx + 2) : '';
-      commitMsg = newPrefix + currentDesc;
-    }
     // Update prefix span without losing focus on desc input
     const prefixEl = document.getElementById('msgPrefix');
     if (prefixEl) {
-      const ci = commitMsg.indexOf(': ');
-      prefixEl.textContent = ci >= 0 ? commitMsg.slice(0, ci + 1) : commitMsg;
+      prefixEl.textContent = getPrefix().slice(0, -1); // "type(scope):" without trailing space
     }
+    const full = getFullMsg();
     const counter = document.getElementById('charCounter');
     if (counter) {
-      counter.textContent = commitMsg.length + ' / 72';
-      counter.className = 'char-counter' + (commitMsg.length > 72 ? ' over' : '');
+      counter.textContent = full.length + ' / 72';
+      counter.className = 'char-counter' + (full.length > 72 ? ' over' : '');
     }
   } else {
-    if (!userEditedMsg) {
-      commitMsg = buildMsg(files.filter(f => selectedPaths.has(f.filepath)), commitType);
-      const msgEl = document.getElementById('msgEdit');
-      if (msgEl) msgEl.value = commitMsg;
-      const counter = document.getElementById('charCounter');
-      if (counter) {
-        counter.textContent = commitMsg.length + ' / 72';
-        counter.className = 'char-counter' + (commitMsg.length > 72 ? ' over' : '');
-      }
+    const full = getFullMsg();
+    const counter = document.getElementById('charCounter');
+    if (counter) {
+      counter.textContent = full.length + ' / 72';
+      counter.className = 'char-counter' + (full.length > 72 ? ' over' : '');
     }
   }
   refreshCmd();
@@ -822,15 +780,12 @@ function onScopeEdit(val) {
 
 function clearScope() {
   customScope = '';
-  if (!userEditedMsg) {
-    commitMsg = buildMsg(files.filter(f => selectedPaths.has(f.filepath)), commitType);
-  }
   render();
 }
 
 function refreshCmd() {
   const sel = files.filter(f => selectedPaths.has(f.filepath));
-  const cmd = buildCmd(sel, commitMsg, showBody ? commitBody : '', breakingChange, breakingMsg, footers);
+  const cmd = buildCmd(sel, getFullMsg(), showBody ? commitBody : '', breakingChange, breakingMsg, footers);
   const box = document.getElementById('cmdBox');
   if (box) {
     box.innerHTML = (cmd ? highlightCmd(cmd) : '<span class="cp" style="opacity:0.4">select files above</span>');
@@ -900,18 +855,7 @@ window.addEventListener('message', e => {
       if (!files.find(x => x.filepath === f.filepath)) selectedPaths.add(f.filepath);
     });
     files = data.files;
-    if (commitType !== 'none') {
-      const colonIdx = commitMsg.indexOf(': ');
-      const currentDesc = userEditedMsg && colonIdx >= 0 ? commitMsg.slice(colonIdx + 2) : null;
-      commitMsg = buildMsg(files.filter(f => selectedPaths.has(f.filepath)), commitType);
-      if (currentDesc !== null) {
-        const newColonIdx = commitMsg.indexOf(': ');
-        const newPrefix = newColonIdx >= 0 ? commitMsg.slice(0, newColonIdx + 2) : '';
-        commitMsg = newPrefix + currentDesc;
-      }
-    } else if (!userEditedMsg) {
-      commitMsg = buildMsg(files.filter(f => selectedPaths.has(f.filepath)), commitType);
-    }
+    regenIfNeeded();
     if (showBody && !userEditedBody) commitBody = buildBody(files.filter(f => selectedPaths.has(f.filepath)));
     render();
   } else if (data.command === 'aiStateUpdate') {
@@ -925,13 +869,7 @@ window.addEventListener('message', e => {
       } else {
         aiMsgError = '';
         userEditedMsg = true;
-        if (commitType !== 'none') {
-          const colonIdx = commitMsg.indexOf(': ');
-          const prefix = colonIdx >= 0 ? commitMsg.slice(0, colonIdx + 2) : '';
-          commitMsg = prefix + data.text;
-        } else {
-          commitMsg = data.text;
-        }
+        commitMsg = data.text;
       }
     } else if (data.mode === 'body') {
       aiGeneratingBody = false;

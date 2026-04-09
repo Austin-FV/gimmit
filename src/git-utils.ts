@@ -1,4 +1,4 @@
-import { execSync } from "child_process";
+import { execFileSync } from "child_process";
 import * as path from "path";
 import * as fs from "fs";
 import * as vscode from "vscode";
@@ -8,9 +8,11 @@ import { ChangedFile, detectChangeType } from "./detection";
 
 export function getChangedFiles(repoRoot: string): ChangedFile[] {
   try {
-    console.log("repoRoot:", repoRoot);
-    const output = execSync("git status --porcelain -uall", { cwd: repoRoot }).toString();
-    console.log("git output:", JSON.stringify(output));
+
+    const output = execFileSync("git", ["status", "--porcelain", "-uall"], { 
+      cwd: repoRoot 
+    }).toString();
+
     return output
       .split("\n")
       .filter((line) => line.trim().length > 0)
@@ -33,7 +35,7 @@ export function getGitDiff(repoRoot: string, filePaths: string[]): string {
     // Get diff for tracked files (staged + unstaged)
     const tracked = filePaths.filter((f) => {
       try {
-        execSync(`git ls-files --error-unmatch "${f}"`, {
+        execFileSync("git", ["ls-files", "--error-unmatch", f], {
           cwd: repoRoot,
           stdio: "pipe",
         });
@@ -48,20 +50,20 @@ export function getGitDiff(repoRoot: string, filePaths: string[]): string {
     if (tracked.length) {
       try {
         // Staged changes
-        const stagedDiff = execSync(
-          `git diff --cached -- ${tracked.map((f) => `"${f}"`).join(" ")}`,
-          { cwd: repoRoot, maxBuffer: 1024 * 1024 }
+        const stagedDiff = execFileSync(
+          "git", ["diff", "--cached", "--", ...tracked],
+          { cwd: repoRoot, maxBuffer: 5 * 1024 * 1024 }
         ).toString();
         diff += stagedDiff;
-      } catch { /* ignore */ }
+      } catch { /* ignore partial diff failures */ }
       try {
         // Unstaged changes
-        const unstagedDiff = execSync(
-          `git diff -- ${tracked.map((f) => `"${f}"`).join(" ")}`,
-          { cwd: repoRoot, maxBuffer: 1024 * 1024 }
+        const unstagedDiff = execFileSync(
+          "git", ["diff", "--", ...tracked],
+          { cwd: repoRoot, maxBuffer: 5 * 1024 * 1024 }
         ).toString();
         diff += unstagedDiff;
-      } catch { /* ignore */ }
+      } catch { /* ignore partial diff failures */ }
     }
 
     // For untracked files, show their content as "new file"
@@ -73,7 +75,7 @@ export function getGitDiff(repoRoot: string, filePaths: string[]): string {
           .split("\n")
           .map((l) => `+${l}`)
           .join("\n")}\n`;
-      } catch { /* ignore */ }
+      } catch { /* ignore unreadable untracked files */ }
     }
 
     return diff;
@@ -93,7 +95,7 @@ export function getRepoRoot(filePath: string): string | undefined {
     } catch {
       cwd = path.dirname(filePath);
     }
-    return execSync("git rev-parse --show-toplevel", { cwd }).toString().trim();
+    return execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd }).toString().trim();
   } catch {
     return undefined;
   }

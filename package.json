@@ -13,15 +13,16 @@
         "command": "gimmit.open",
         "title": "Gimmit: Open"
       },
-      { 
-        "command": "gimmit.setApiKey", 
-        "title": "Gimmit: Set API Key" 
+      {
+        "command": "gimmit.setApiKey",
+        "title": "Gimmit: Set API Key"
       },
-      { 
-        "command": "gimmit.manageApiKey", 
-        "title": "Gimmit: Manage API Key" 
+      {
+        "command": "gimmit.manageApiKey",
+        "title": "Gimmit: Manage API Key"
       }
-    ],"viewsContainers": {
+    ],
+    "viewsContainers": {
       "activitybar": [
         {
           "id": "gimmit",
@@ -58,7 +59,12 @@
     "color": "#0d0f14",
     "theme": "dark"
   },
-  "keywords": ["git", "commit", "conventional commits", "scm"],
+  "keywords": [
+    "git",
+    "commit",
+    "conventional commits",
+    "scm"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/Austin-FV/gimmit"

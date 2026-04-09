@@ -291,7 +291,7 @@ async function callGoogle(
     },
   });
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent`;
 
   const response = await httpsRequest(
     url,
@@ -299,6 +299,7 @@ async function callGoogle(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "x-goog-api-key": apiKey,
       },
     },
     body

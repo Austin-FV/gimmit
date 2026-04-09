@@ -4,7 +4,7 @@
 ### Added
 - Conventional commit message builder with type detection (feat, fix, docs, chore, refactor, style, test, perf, build, ci, none)
 - Live file tracking with auto-updates from git status
-- AI-powered commit message and body generation using Claude, OpenAI, or Gemini
+- AI-powered commit message and body generation using Anthropic, OpenAI, or Google
 - Secure API key management via OS keychain (VS Code SecretStorage)
 - Run commits directly from the sidebar
 - 15-second undo window after committing

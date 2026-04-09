@@ -23,7 +23,7 @@ Gimmit automates it by:
 ## Features
 
 - **Clean conventional commits** — properly formatted every time
-- **AI-powered messages** — optional AI generation for commit messages using Claude, OpenAI, or Gemini
+- **AI-powered messages** — optional AI generation for commit messages using Anthropic, OpenAI, or Google
 - **Live file tracking** — auto-updates from `git status`
 - **Smart commit suggestions** — based on file names and paths
 - **Run or copy commands** — execute `git add` + `git commit` directly from the sidebar, or copy to clipboard
@@ -71,9 +71,9 @@ Gimmit can use AI to generate commit messages and bodies based on your actual co
  
 | Provider | Models |
 |----------|--------|
-| Claude (Anthropic) | Haiku 4.5, Sonnet 4.6, Opus 4.6 |
+| Anthropic | Claude Haiku 4.5, Claude Sonnet 4.6, Claude Opus 4.6 |
 | OpenAI | GPT-5 Nano, GPT-5.4 Nano |
-| Gemini (Google) | 2.5 Flash Lite, 3.1 Flash Lite Preview |
+| Google | Gemini 2.5 Flash Lite, Gemini 3.1 Flash Lite Preview |
  
 ### Setup
  
@@ -123,7 +123,7 @@ Supported tokens:
 ```
 src/
 ├── extension.ts        # activate(), GitCommitViewProvider class
-├── ai-service.ts       # AI provider integrations (Claude, OpenAI, Gemini)
+├── ai-service.ts       # AI provider integrations (Anthropic, OpenAI, Google)
 ├── git-utils.ts        # getChangedFiles(), getGitDiff(), getRepoRoot(), findRepoFromWorkspace()
 ├── detection.ts        # CommitType, ChangedFile, detectChangeType(), patterns
 └── webview/

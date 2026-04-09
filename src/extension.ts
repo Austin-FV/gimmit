@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { execSync, execFileSync } from "child_process";
+import { execFileSync } from "child_process";
 import * as path from "path";
 import * as fs from "fs";
 import {
@@ -307,7 +307,7 @@ class GitCommitViewProvider implements vscode.WebviewViewProvider {
     if (!this._view || !this._repoRoot) return;
 
     try {
-      execSync("git reset HEAD~1", {
+      execFileSync("git", ["reset", "HEAD~1"], {
         cwd: this._repoRoot,
         stdio: "pipe",
       });

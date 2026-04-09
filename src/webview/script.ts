@@ -130,7 +130,7 @@ function buildCmd(selected, msg, body, breaking, brkMsg, footers) {
 }
 
 function esc(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
 function statusColor(s) {
@@ -156,6 +156,7 @@ function highlightCmd(cmd) {
 }
 
 function render() {
+  try {
   const root = document.getElementById('root');
   const selected = files.filter(f => selectedPaths.has(f.filepath));
 
@@ -430,6 +431,11 @@ function render() {
         : '')+
       '</div>'+
     '</div>';
+  } catch (e) {
+    console.error('render error:', e);
+    const root = document.getElementById('root');
+    if (root) root.innerHTML = '<div class="empty"><div>Something went wrong.<br><a style="color:var(--vscode-textLink-foreground);cursor:pointer;font-size:11px" onclick="render()">retry</a> · <a style="color:var(--vscode-textLink-foreground);cursor:pointer;font-size:11px" onclick="refreshFiles()">↻ refresh</a></div></div>';
+  }
 }
 
 function setType(t) {

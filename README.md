@@ -9,12 +9,6 @@
 
 ⚡ Select files → pick a type → commit in seconds
 
-<!-- 
-![Version](https://img.shields.io/visual-studio-marketplace/v/YOUR_PUBLISHER.gimmit)
-![Installs](https://img.shields.io/visual-studio-marketplace/i/YOUR_PUBLISHER.gimmit)
-![Rating](https://img.shields.io/visual-studio-marketplace/r/YOUR_PUBLISHER.gimmit) 
--->
-
 ## Features
 
 - ⚡ **Instant commits** — generate and run commits in seconds  
@@ -33,8 +27,8 @@
 3. Search for **gimmit**
 4. Click **Install**
 
-<!-- Or install from the Marketplace:
-👉 [Install gimmit](https://marketplace.visualstudio.com/items?itemName=YOUR_PUBLISHER.gimmit) -->
+Or install from the Marketplace:
+👉 [Install gimmit](https://marketplace.visualstudio.com/items?itemName=austinfv.gimmit)
 
 ## Commands
 

@@ -5,7 +5,9 @@
   "version": "1.0.0",
   "engines": { "vscode": "^1.85.0" },
   "categories": ["Other"],
-  "activationEvents": [],
+  "activationEvents": [
+    "onCommand:gimmit.open"
+  ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [

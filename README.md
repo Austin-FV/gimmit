@@ -1,52 +1,58 @@
 # gimmit
+
 Generate clean, conventional commit messages directly from your changed files — without leaving VS Code.
 
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+
+<!-- ![Visual Studio Marketplace Version](https://img.shields.io/visual-studio-marketplace/v/YOUR_PUBLISHER.gimmit) -->
+<!-- ![Visual Studio Marketplace Installs](https://img.shields.io/visual-studio-marketplace/i/YOUR_PUBLISHER.gimmit) -->
+
 ## Demo
 
-<!-- Replace this GIF with a real demo -->
+<!-- Replace with a real recording -->
 <!-- ![gimmit demo](./media/demo.gif) -->
+
 🚧 Demo coming soon
-> Select files → pick a commit type → copy a ready-to-run git command
+
+> Select files → pick a commit type → generate a ready-to-run git command
 
 ## Why gimmit?
 
-Writing conventional commits manually is slow and inconsistent.
+Writing conventional commits manually is slow and inconsistent. Gimmit automates it by reading your changed files, suggesting the correct commit type, and generating a ready-to-use command — with optional AI-powered descriptions from your actual diffs.
 
-Gimmit automates it by:
-- reading your changed files
-- suggesting the correct commit type
-- generating a ready-to-use command
-
-> Think of gimmit as a smart layer on top of `git add` + `git commit`.
+> Think of it as a smart layer on top of `git add` + `git commit`.
 
 ## Features
 
-- **Clean conventional commits** — properly formatted every time
-- **AI-powered messages** — optional AI generation for commit messages using Anthropic, OpenAI, or Google
-- **Live file tracking** — auto-updates from `git status`
-- **Smart commit suggestions** — based on file names and paths
-- **Run or copy commands** — execute `git add` + `git commit` directly from the sidebar, or copy to clipboard
+- **Conventional commits** — properly formatted every time, with support for all standard types
+- **AI-powered messages** — optional commit message and body generation using Anthropic, OpenAI, or Google
+- **Live file tracking** — auto-refreshes from `git status` on save, tab switch, and window focus
+- **Smart type detection** — suggests `fix`, `docs`, `test`, `chore`, `style`, or `feat` based on file names and paths
+- **Run or copy** — execute `git add` + `git commit` directly from the sidebar, or copy the command to clipboard
+- **Undo support** — 15-second undo window after every commit
+- **Scope, body, footers, breaking changes** — full conventional commit spec support
+- **Multi-repo aware** — detects and switches between git repositories across workspaces
+- **Secure key storage** — API keys stored in your OS keychain via VS Code's SecretStorage
 
 ## Usage
 
 1. Open a git repository in VS Code
 2. Make some changes to files
-3. Open the **Gimmit** panel (activity bar)
+3. Open the **Gimmit** panel in the activity bar
 4. Select which files to include in the commit
 5. Choose a commit type — gimmit suggests one automatically
-6. Adjust the message if needed, or use '**✦**' to generate one with AI
+6. Adjust the message if needed, or click **✦** to generate one with AI
 7. Optionally add a body, footers, or mark as a breaking change
-8. Click '**Run**' to commit directly, or '**Copy**' to paste into your terminal
+8. Click **Run** to commit directly, or **Copy** to paste into your terminal
 
-Basic example:
+**Basic example:**
 
 ```
 git add src/auth.ts src/api/users.ts
 git commit -m "feat(src): add JWT refresh token logic"
 ```
 
-Advanced example (with body + footers):
+**With body + footers:**
 
 ```
 git add src/auth.ts
@@ -56,60 +62,86 @@ Co-authored-by: Jane <jane@example.com>"
 ```
 
 ## Commands
- 
-| Command | Description |
-|---------|-------------|
-| `Gimmit: Open` | Focus the gimmit sidebar panel |
-| `Gimmit: Set API Key` | Open the API key manager (provider picker → secure input) |
+
+| Command                  | Description                                              |
+| ------------------------ | -------------------------------------------------------- |
+| `Gimmit: Open`           | Focus the gimmit sidebar panel                           |
+| `Gimmit: Set API Key`    | Open the API key manager (provider picker → secure input) |
 | `Gimmit: Manage API Key` | Manage a specific provider's API key (replace or delete) |
 
 ## AI Assist
- 
-Gimmit can use AI to generate commit messages and bodies based on your actual code changes (git diff). This is entirely optional — the extension works without it.
- 
+
+Gimmit can generate commit messages and bodies from your actual code changes (git diff). This is entirely optional — the extension works fully without it.
+
 ### Supported providers
- 
-| Provider | Models |
-|----------|--------|
+
+| Provider  | Models                                          |
+| --------- | ----------------------------------------------- |
 | Anthropic | Claude Haiku 4.5, Claude Sonnet 4.6, Claude Opus 4.6 |
-| OpenAI | GPT-5 Nano, GPT-5.4 Nano |
-| Google | Gemini 2.5 Flash Lite, Gemini 3.1 Flash Lite Preview |
- 
+| OpenAI    | GPT-5 Nano, GPT-5.4 Nano                       |
+| Google    | Gemini 2.5 Flash Lite, Gemini 3.1 Flash Lite Preview |
+
 ### Setup
- 
+
 1. Open the **AI Assist** section in the gimmit sidebar
 2. Select a provider and model
 3. Click **manage** to set your API key (or run `Gimmit: Set API Key` from the command palette)
-4. API keys are stored securely in your OS keychain via VS Code's SecretStorage — never in settings files
 
-### Usage
- 
+API keys are stored securely in your OS keychain via VS Code's SecretStorage — never in settings files.
+
+### How it works
+
 Once configured, a **✦** button appears inside the commit message and body input fields. Click it to generate content based on your selected files and their diffs. The AI writes only the description — the conventional commit prefix, scope, and type remain under your control.
-
 
 ## Commit Types
 
-| Type       | Description                          | Auto-detected from                                        |
-|------------|--------------------------------------|-----------------------------------------------------------|
-| `feat`     | New feature                          | Everything else                                           |
-| `fix`      | Bug fix                              | `bug`, `fix`, `patch`, `hotfix`, `error`, `crash`        |
-| `docs`     | Documentation                        | `README`, `.md`, `docs/`, `changelog`, `LICENSE`, `.txt` |
-| `chore`    | Config or tooling                    | `.json`, `.yaml`, `.yml`, `.env`, `config`, `Dockerfile`   |
-| `style`    | Formatting, CSS                      | `.css`, `.scss`, `.less`, `.styled.`, `theme`            |
-| `test`     | Tests                                | `.test.`, `.spec.`, `__tests__/`, `test/`                |
-| `refactor` | Code restructure, no behaviour change| —                                                         |
-| `perf`     | Performance improvement              | —                                                         |
-| `build`    | Build system changes                 | —                                                         |
-| `ci`       | CI/CD configuration                  | —                                                         |
-| `none`     | no conventional commits!       | —                                                         |
+| Type       | Description                           | Auto-detected from                                                      |
+| ---------- | ------------------------------------- | ----------------------------------------------------------------------- |
+| `feat`     | New feature                           | Default for unmatched files                                             |
+| `fix`      | Bug fix                               | `bug`, `fix`, `patch`, `hotfix`, `error`, `issue`, `crash`, `fail`      |
+| `docs`     | Documentation                         | `README`, `.md`, `docs/`, `changelog`, `LICENSE`, `.txt`                |
+| `chore`    | Config or tooling                     | `.json`, `.yaml`, `.yml`, `.env`, `config`, `.toml`, `.ini`, `Dockerfile`, `.sh` |
+| `style`    | Formatting, CSS                       | `.css`, `.scss`, `.less`, `.styled.`, `theme`                           |
+| `test`     | Tests                                 | `.test.`, `.spec.`, `__tests__/`, `test/`                               |
+| `refactor` | Code restructure, no behavior change  | —                                                                       |
+| `perf`     | Performance improvement               | —                                                                       |
+| `build`    | Build system changes                  | —                                                                       |
+| `ci`       | CI/CD configuration                   | —                                                                       |
+| `none`     | No conventional commit prefix         | —                                                                       |
+
+Deleted files are automatically detected as `chore`.
 
 ## Footer Tokens
 
-Supported tokens:
-- Issue tracking: `Refs`, `Closes`, `Fixes`
-- Attribution: `Co-authored-by`, `Reviewed-by`
-- References: `See-also`
-- Custom: define your own
+Supported tokens: `Refs`, `Closes`, `Fixes`, `Co-authored-by`, `Reviewed-by`, `See-also`, and custom tokens.
+
+## Technical Details
+
+### Architecture
+
+```
+src/
+├── extension.ts        # activate(), GitCommitViewProvider, command registration
+├── ai-service.ts       # AI provider integrations (Anthropic, OpenAI, Google)
+├── git-utils.ts        # git status, diff, repo detection, availability check
+├── detection.ts        # commit type detection from file paths
+└── webview/
+    ├── content.ts      # HTML generation with CSP nonce
+    ├── styles.ts       # CSS
+    └── script.ts       # Webview UI logic with delegated event handling
+```
+
+### Key implementation details
+
+- **Security** — Content Security Policy with nonce-based script execution; all event handlers use delegation (no inline `onclick`); HTML output is escaped to prevent XSS; git commands use `execFileSync` to avoid shell injection
+- **Git integration** — uses `execFileSync` for all git operations, avoiding shell interpolation; supports staged, unstaged, and untracked file diffs; walks workspace folders and subdirectories to find repo roots
+- **State management** — commit description stored separately from the conventional commit prefix; prefix is computed from type, scope, and breaking change state; user edits are preserved across type switches and file selection changes
+- **AI integration** — provider-agnostic design with a unified `generateWithAi` interface; request sequencing prevents stale responses from overwriting newer ones; prompts are tuned per mode (message vs body) with diff truncation for large changesets
+
+### Built with
+
+- TypeScript, VS Code Webview API, VS Code SecretStorage
+- No runtime dependencies — all AI calls use Node.js built-in `https`
 
 ## Development
 
@@ -118,21 +150,6 @@ Supported tokens:
 - [Node.js](https://nodejs.org/) v18+
 - [VS Code](https://code.visualstudio.com/)
 
-### Project structure
- 
-```
-src/
-├── extension.ts        # activate(), GitCommitViewProvider class
-├── ai-service.ts       # AI provider integrations (Anthropic, OpenAI, Google)
-├── git-utils.ts        # getChangedFiles(), getGitDiff(), getRepoRoot(), findRepoFromWorkspace()
-├── detection.ts        # CommitType, ChangedFile, detectChangeType(), patterns
-└── webview/
-    ├── content.ts      # getWebviewContent(), getNoWorkspaceContent()
-    ├── styles.ts       # CSS string export
-    └── script.ts       # Webview JS logic string export
-```
-
-
 ### Run locally
 
 ```bash
@@ -140,7 +157,7 @@ npm install
 npm run compile
 ```
 
-Press **F5** in VS Code to launch an Extension Development Host with 'gimmit' loaded.
+Press **F5** in VS Code to launch an Extension Development Host with gimmit loaded.
 
 ### Watch mode
 
@@ -148,17 +165,14 @@ Press **F5** in VS Code to launch an Extension Development Host with 'gimmit' lo
 npm run watch
 ```
 
-Recompiles automatically on every save.
-
-## Packaging & Publishing
+### Packaging
 
 ```bash
 npm install -g @vscode/vsce
-vsce package
-# produces gimmit-1.0.0.vsix
+vsce package        # produces gimmit-1.0.0.vsix
 ```
 
-Install a `.vsix` locally:
+Install locally:
 
 ```bash
 code --install-extension gimmit-1.0.0.vsix
@@ -170,16 +184,14 @@ Publish to the marketplace:
 vsce publish
 ```
 
-You will need a Personal Access Token from [Azure DevOps](https://dev.azure.com) with Marketplace publish permissions, and a publisher ID registered at [marketplace.visualstudio.com](https://marketplace.visualstudio.com).
+Requires a [Personal Access Token](https://dev.azure.com) with Marketplace publish permissions and a publisher ID from [marketplace.visualstudio.com](https://marketplace.visualstudio.com).
 
 ## Requirements
 
-- Git must be installed and available in your system PATH
-- A workspace folder containing a git repository must be open
+- VS Code 1.85+
+- Git installed and available in your system PATH
 - For AI features: an API key from at least one supported provider
 
 ## License
 
-This project is licensed under the **MIT License**.
-
-See the [LICENSE](LICENSE) file for details.
+MIT — see [LICENSE](LICENSE) for details.

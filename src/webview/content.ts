@@ -11,18 +11,31 @@ export interface AiState {
   hasKey: Record<AiProvider, boolean>;
 }
 
+// ─── Nonce ────────────────────────────────────────────────────────────────────
+
+function getNonce(): string {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  let nonce = "";
+  for (let i = 0; i < 32; i++) {
+    nonce += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return nonce;
+}
+
 // ─── Main Webview Content ─────────────────────────────────────────────────────
 
 export function getWebviewContent(files: ChangedFile[], aiState: AiState): string {
   const filesJson = JSON.stringify(files);
   const aiStateJson = JSON.stringify(aiState);
   const modelsJson = JSON.stringify(PROVIDER_MODELS);
+  const nonce = getNonce();
 
   return /* html */`<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';">
 <title>Git Commit Helper</title>
 <style>
 ${getStyles()}
@@ -38,7 +51,7 @@ ${getStyles()}
 </div>
 <div id="cmd-footer"></div>
 
-<script>
+<script nonce="${nonce}">
 ${getScript(filesJson, modelsJson, aiStateJson)}
 </script>
 </body>
@@ -52,6 +65,7 @@ export function getNoWorkspaceContent(): string {
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline';">
 <style>
   body{
     background:var(--vscode-sideBar-background);

@@ -4,6 +4,17 @@ import * as fs from "fs";
 import * as vscode from "vscode";
 import { ChangedFile, detectChangeType } from "./detection";
 
+// ─── Git Availability ────────────────────────────────────────────────────────
+
+export function isGitAvailable(): boolean {
+  try {
+    execFileSync("git", ["--version"], { stdio: "pipe" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // ─── Changed Files ───────────────────────────────────────────────────────────
 
 export function getChangedFiles(repoRoot: string): ChangedFile[] {
@@ -75,7 +86,7 @@ export function getGitDiff(repoRoot: string, filePaths: string[]): string {
           .split("\n")
           .map((l) => `+${l}`)
           .join("\n")}\n`;
-      } catch { /* ignore unreadable untracked files */ }
+      } catch { /* ignore */ }
     }
 
     return diff;

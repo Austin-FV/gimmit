@@ -176,7 +176,7 @@ function render() {
   const selected = files.filter(f => selectedPaths.has(f.filepath));
 
   if (!files.length) {
-    root.innerHTML = '<div class="empty"><div>No changed files.<br>Edits appear here automatically.<br><a style="color:var(--vscode-textLink-foreground);cursor:pointer;font-size:11px;margin-top:6px;display:inline-block" onclick="refreshFiles()">↻ refresh</a></div></div>';
+    root.innerHTML = '<div class="empty"><div>No changed files.<br>Edits appear here automatically.<br><a style="color:var(--vscode-textLink-foreground);cursor:pointer;font-size:11px;margin-top:6px;display:inline-block" data-action="refreshFiles">↻ refresh</a></div></div>';
     const footer = document.getElementById('cmd-footer');
     if (footer) {
       if (undoActive) {
@@ -186,7 +186,7 @@ function render() {
               '<div class="undo-bar">'+
                 '<span class="undo-check">✓</span>'+
                 '<span>Committed</span>'+
-                '<button class="undo-link" onclick="undoCommit()">undo</button>'+
+                '<button class="undo-link" data-action="undoCommit">undo</button>'+
                 '<span class="undo-timer" id="undoTimerText">'+undoSeconds+'s</span>'+
               '</div>'+
             '</div>'+
@@ -202,7 +202,7 @@ function render() {
     const color = TYPE_META[t];
     const active = t === commitType ? 'active' : '';
     const style = t === commitType ? 'background:'+color+';color:#000' : '';
-    return '<button class="chip '+active+'" style="'+style+'" data-type="'+t+'" onclick="setType(this.dataset.type)">'+t+'</button>';
+    return '<button class="chip '+active+'" style="'+style+'" data-type="'+t+'" data-action="setType">'+t+'</button>';
   }).join('');
 
   const rows = files.map(f => {
@@ -212,8 +212,8 @@ function render() {
     const fdir  = parts.join('/');
     const hint  = f.suggestedType !== commitType ? f.suggestedType : '';
     const fp = esc(f.filepath);
-  return '<div class="file-row '+(sel?'selected':'')+'" data-path="'+fp+'" onclick="toggleFile(this.dataset.path)">'+
-      '<input type="checkbox" '+(sel?'checked':'')+' data-path="'+fp+'" onclick="event.stopPropagation();toggleFile(this.dataset.path)"/>'+
+  return '<div class="file-row '+(sel?'selected':'')+'" data-path="'+fp+'" data-action="toggleFile">'+
+      '<input type="checkbox" '+(sel?'checked':'')+' data-path="'+fp+'" data-action="toggleFile"/>'+
       '<div class="custom-check"></div>'+
       '<span class="file-status" style="color:'+statusColor(f.status)+'">'+esc(f.status||'?')+'</span>'+
       '<div class="file-info">'+
@@ -231,7 +231,7 @@ function render() {
   const FOOTER_TOKENS = ['Refs', 'Closes', 'Fixes', 'Co-authored-by', 'Reviewed-by', 'See-also', 'Custom'];
 
   const aiBodyInline = isAiReady()
-    ? '<button class="ai-inline-btn body-ai-inline" id="aiBodyBtn" title="Generate with AI" onclick="event.stopPropagation();aiGenerateBody()"'+(aiGeneratingBody?' disabled':'')+'>'+
+    ? '<button class="ai-inline-btn body-ai-inline" id="aiBodyBtn" title="Generate with AI" data-action="aiGenerateBody"'+(aiGeneratingBody?' disabled':'')+'>'+
         (aiGeneratingBody ? '<span class="ai-loading"></span>' : '<span class="ai-gen-spark">✦</span>')+
       '</button>'
     : '';
@@ -239,20 +239,20 @@ function render() {
   const bodySection =
     '<div class="msg-section">'+
       '<div class="section-label-row">'+
-        '<div class="collapsible-header" onclick="toggleBody()">'+
+        '<div class="collapsible-header" data-action="toggleBody">'+
           '<span class="collapsible-arrow">'+(showBody?'▾':'▸')+'</span>'+
           '<span class="section-label">Commit Body</span>'+
         '</div>'+
         (showBody ?
           '<div class="section-label-row-right" id="bodyLabelRight">'+
-            (userEditedBody ? '<button class="reset-link" id="bodyResetBtn" onclick="regenBody()">↺ reset</button>' : '')+
+            (userEditedBody ? '<button class="reset-link" id="bodyResetBtn" data-action="regenBody">↺ reset</button>' : '')+
           '</div>'
         : '')+
       '</div>'+
       (showBody ? (()=>{
         const longest = commitBody.split(String.fromCharCode(10)).reduce((max,l)=>Math.max(max,l.length),0);
         return '<div class="msg-wrap">'+
-          '<textarea class="msg-edit" rows="4" id="bodyEdit" oninput="onBodyEdit(this.value)">'+esc(commitBody)+'</textarea>'+
+          '<textarea class="msg-edit" rows="4" id="bodyEdit" data-input="onBodyEdit">'+esc(commitBody)+'</textarea>'+
           aiBodyInline+
         '</div>'+
         '<div class="body-counter '+(longest>72?'over':'')+'" id="bodyCounter">longest line: '+longest+' / 72</div>'+
@@ -266,15 +266,15 @@ function render() {
       '<option value="'+t+'"'+(f.token===t?' selected':'')+'>'+t+'</option>'
     ).join('');
     return '<div class="footer-row">'+
-      '<select class="footer-select" data-idx="'+i+'" onchange="updateFooterToken(+this.dataset.idx,this.value)">'+tokenOpts+'</select>'+
+      '<select class="footer-select" data-idx="'+i+'" data-change="updateFooterToken">'+tokenOpts+'</select>'+
       (f.token === 'Custom' ?
-        '<input class="footer-token-input" placeholder="token" value="'+esc(f.customToken)+'" data-idx="'+i+'" oninput="updateFooterCustomToken(+this.dataset.idx,this.value)"/>'
+        '<input class="footer-token-input" placeholder="token" value="'+esc(f.customToken)+'" data-idx="'+i+'" data-input="updateFooterCustomToken"/>'
       : '')+
       '<div class="footer-value-wrap">'+
-        '<input class="footer-value-input" placeholder="value" maxlength="'+MAX_FOOTER_VAL+'" value="'+esc(f.value)+'" data-idx="'+i+'" oninput="updateFooterValue(+this.dataset.idx,this.value)"/>'+
+        '<input class="footer-value-input" placeholder="value" maxlength="'+MAX_FOOTER_VAL+'" value="'+esc(f.value)+'" data-idx="'+i+'" data-input="updateFooterValue"/>'+
         '<span class="footer-val-counter '+(f.value.length>90?'over':'')+'" id="fvc'+i+'">'+f.value.length+'/'+MAX_FOOTER_VAL+'</span>'+
       '</div>'+
-      '<button class="footer-remove" data-idx="'+i+'" onclick="removeFooter(+this.dataset.idx)" title="Remove">×</button>'+
+      '<button class="footer-remove" data-idx="'+i+'" data-action="removeFooter" title="Remove">×</button>'+
     '</div>';
   }).join('');
 
@@ -282,11 +282,11 @@ function render() {
     '<div class="msg-section">'+
       '<div class="section-label-row">'+
         '<span class="section-label" style="color:var(--vscode-errorForeground)">⚠ Breaking Change</span>'+
-        '<button class="toggle-btn" onclick="toggleBreaking()">'+(breakingChange ? '▾ remove' : '▸ add')+'</button>'+
+        '<button class="toggle-btn" data-action="toggleBreaking">'+(breakingChange ? '▾ remove' : '▸ add')+'</button>'+
       '</div>'+
       (breakingChange ?
         '<div class="msg-wrap">'+
-          '<textarea class="msg-edit" rows="2" id="breakingEdit" placeholder="describe what breaks and how to migrate..." oninput="onBreakingEdit(this.value)">'+esc(breakingMsg)+'</textarea>'+
+          '<textarea class="msg-edit" rows="2" id="breakingEdit" placeholder="describe what breaks and how to migrate..." data-input="onBreakingEdit">'+esc(breakingMsg)+'</textarea>'+
         '</div>'
       : '')+
     '</div>';
@@ -298,10 +298,10 @@ function render() {
       '<span class="section-label">Footers</span>'+
       '<div style="display:flex;gap:8px;align-items:center">'+
         (footers.length ?
-          '<button class="toggle-btn" style="color:var(--vscode-descriptionForeground)" onclick="clearFooters()">clear all</button>'
+          '<button class="toggle-btn" style="color:var(--vscode-descriptionForeground)" data-action="clearFooters">clear all</button>'
         : '')+
         (footers.length < MAX_FOOTERS ?
-          '<button class="toggle-btn" onclick="addFooter()">▸ add footer</button>'
+          '<button class="toggle-btn" data-action="addFooter">▸ add footer</button>'
         :
           '<span style="font-size:10px;color:var(--vscode-descriptionForeground);opacity:0.6">max '+MAX_FOOTERS+'</span>'
         )+
@@ -327,7 +327,7 @@ function render() {
 
   const aiSection =
     '<div class="ai-section">'+
-      '<div class="ai-header" onclick="toggleAiSettings()">'+
+      '<div class="ai-header" data-action="toggleAiSettings">'+
         '<div class="ai-header-left">'+
           '<span class="ai-spark">✦</span>'+
           '<span class="ai-title">AI Assist</span>'+
@@ -339,12 +339,12 @@ function render() {
         '<div class="ai-body">'+
           '<div class="ai-row">'+
             '<span class="ai-row-label">Provider</span>'+
-            '<select class="ai-select" onchange="onAiProviderChange(this.value)">'+providerOpts+'</select>'+
+            '<select class="ai-select" data-change="onAiProviderChange">'+providerOpts+'</select>'+
           '</div>'+
           (aiState.provider !== 'none' ?
             '<div class="ai-row">'+
               '<span class="ai-row-label">Model</span>'+
-              '<select class="ai-select" onchange="onAiModelChange(this.value)">'+modelOpts+'</select>'+
+              '<select class="ai-select" data-change="onAiModelChange">'+modelOpts+'</select>'+
             '</div>'+
             '<div class="ai-key-row">'+
               '<span class="ai-row-label">API Key</span>'+
@@ -353,7 +353,7 @@ function render() {
               :
                 '<span class="ai-key-status missing">● not set</span>'
               )+
-              '<button class="ai-key-manage" onclick="manageAiKey()">manage</button>'+
+              '<button class="ai-key-manage" data-action="manageAiKey">manage</button>'+
             '</div>'
           : '')+
         '</div>'
@@ -362,7 +362,7 @@ function render() {
 
   // ── AI inline button for commit message ──
   const aiMsgInline = isAiReady()
-    ? '<button class="ai-inline-btn" id="aiMsgBtn" title="Generate with AI" onclick="event.stopPropagation();aiGenerateMsg()"'+(aiGeneratingMsg?' disabled':'')+'>'+
+    ? '<button class="ai-inline-btn" id="aiMsgBtn" title="Generate with AI" data-action="aiGenerateMsg"'+(aiGeneratingMsg?' disabled':'')+'>'+
         (aiGeneratingMsg ? '<span class="ai-loading"></span>' : '<span class="ai-gen-spark">✦</span>')+
       '</button>'
     : '';
@@ -376,20 +376,20 @@ function render() {
     '<div class="scope-bar">'+
       '<span class="scope-label">SCOPE</span>'+
       '<input class="scope-input" type="text" placeholder="specify scope (optional)" maxlength="20"'+
-        'value="'+esc(customScope)+'" oninput="onScopeEdit(this.value)"/>'+
-      (customScope ? '<button class="scope-clear" onclick="clearScope()" title="Clear scope">×</button>' : '')+
+        'value="'+esc(customScope)+'" data-input="onScopeEdit"/>'+
+      (customScope ? '<button class="scope-clear" data-action="clearScope" title="Clear scope">×</button>' : '')+
     '</div>'+
     '<div class="list-header"'+(showFiles?'':' style="margin-bottom:12px"')+'>'+
-      '<div style="display:flex;align-items:center;gap:4px;cursor:pointer" onclick="toggleFiles()">'+
+      '<div style="display:flex;align-items:center;gap:4px;cursor:pointer" data-action="toggleFiles">'+
         '<span style="font-size:10px;color:var(--vscode-descriptionForeground)">'+(showFiles?'▾':'▸')+'</span>'+
         '<span class="list-label">Changed Files ('+files.length+')</span>'+
         (!showFiles ? '<span style="font-size:10px;color:var(--vscode-descriptionForeground);opacity:0.7">&nbsp;'+selected.length+'/'+files.length+' selected</span>' : '')+
       '</div>'+
       (showFiles ?
         '<div class="quick-links">'+
-          '<a onclick="event.stopPropagation();selectAll()">all</a>'+
-          '<a onclick="event.stopPropagation();selectNone()">none</a>'+
-          '<a onclick="event.stopPropagation();refreshFiles()" title="Refresh file list">↻</a>'+
+          '<a data-action="selectAll">all</a>'+
+          '<a data-action="selectNone">none</a>'+
+          '<a data-action="refreshFiles" title="Refresh file list">↻</a>'+
         '</div>'
       : '')+
     '</div>'+
@@ -397,18 +397,18 @@ function render() {
     '<div class="msg-section">'+
       '<div class="section-label-row" id="msgLabelRow">'+
         '<span class="section-label">Commit Message</span>'+
-        (userEditedMsg ? '<button class="reset-link" id="msgResetBtn" onclick="regenMsg()">↺ reset</button>' : '')+
+        (userEditedMsg ? '<button class="reset-link" id="msgResetBtn" data-action="regenMsg">↺ reset</button>' : '')+
       '</div>'+
       (commitType !== 'none' ? (()=>{
         const prefixDisplay = getPrefix().slice(0, -1); // "type(scope):" without trailing space
         return '<div class="msg-input-row" id="msgInputRow">'+
           '<span class="msg-prefix" id="msgPrefix">'+esc(prefixDisplay)+'</span>'+
-          '<input class="msg-desc-input" id="msgDesc" type="text" value="'+esc(commitMsg)+'" oninput="onDescEdit(this.value)"/>'+
+          '<input class="msg-desc-input" id="msgDesc" type="text" value="'+esc(commitMsg)+'" data-input="onDescEdit"/>'+
           aiMsgInline+
         '</div>';
       })() :
         '<div class="msg-input-row" id="msgInputRow">'+
-          '<input class="msg-desc-input" id="msgEdit" type="text" value="'+esc(commitMsg)+'" oninput="onMsgEdit(this.value)"/>'+
+          '<input class="msg-desc-input" id="msgEdit" type="text" value="'+esc(commitMsg)+'" data-input="onMsgEdit"/>'+
           aiMsgInline+
         '</div>'
       )+
@@ -426,8 +426,8 @@ function render() {
       '<div class="section-label-row">'+
         '<span class="section-label">Git Command</span>'+
         '<div class="cmd-btns">'+
-          '<button class="copy-btn" id="copyBtn" onclick="copyCmd()">Copy</button>'+
-          '<button class="run-btn" id="runBtn" onclick="runCmd()"'+(cmd?'':' disabled')+'>Run</button>'+
+          '<button class="copy-btn" id="copyBtn" data-action="copyCmd">Copy</button>'+
+          '<button class="run-btn" id="runBtn" data-action="runCmd"'+(cmd?'':' disabled')+'>Run</button>'+
         '</div>'+
       '</div>'+
       '<div class="cmd-box" id="cmdBox">'+
@@ -439,7 +439,7 @@ function render() {
           '<div class="undo-bar">'+
             '<span class="undo-check">✓</span>'+
             '<span>Committed</span>'+
-            '<button class="undo-link" onclick="undoCommit()">undo</button>'+
+            '<button class="undo-link" data-action="undoCommit">undo</button>'+
             '<span class="undo-timer" id="undoTimerText">'+undoSeconds+'s</span>'+
           '</div>'
         : '')+
@@ -448,7 +448,7 @@ function render() {
   } catch (e) {
     console.error('render error:', e);
     const root = document.getElementById('root');
-    if (root) root.innerHTML = '<div class="empty"><div>Something went wrong.<br><a style="color:var(--vscode-textLink-foreground);cursor:pointer;font-size:11px" onclick="render()">retry</a> · <a style="color:var(--vscode-textLink-foreground);cursor:pointer;font-size:11px" onclick="refreshFiles()">↻ refresh</a></div></div>';
+    if (root) root.innerHTML = '<div class="empty"><div>Something went wrong.<br><a style="color:var(--vscode-textLink-foreground);cursor:pointer;font-size:11px" data-action="render">retry</a> · <a style="color:var(--vscode-textLink-foreground);cursor:pointer;font-size:11px" data-action="refreshFiles">↻ refresh</a></div></div>';
   }
 }
 
@@ -604,7 +604,7 @@ function renderUndoBar() {
     '<div class="undo-bar">'+
       '<span class="undo-check">✓</span>'+
       '<span>Committed</span>'+
-      '<button class="undo-link" onclick="undoCommit()">undo</button>'+
+      '<button class="undo-link" data-action="undoCommit">undo</button>'+
       '<span class="undo-timer" id="undoTimerText">'+undoSeconds+'s</span>'+
     '</div>';
 }
@@ -926,6 +926,63 @@ window.addEventListener('message', e => {
       // File list will update via the backend refresh and watcher
     }
   }
+});
+
+// ── Delegated Event Listeners (CSP-safe — no inline handlers) ──
+
+const clickActions = {
+  refreshFiles, undoCommit, toggleBody, regenBody, toggleBreaking,
+  clearFooters, addFooter, toggleAiSettings, manageAiKey,
+  aiGenerateMsg, aiGenerateBody, clearScope, toggleFiles,
+  selectAll, selectNone, regenMsg, copyCmd, runCmd, render,
+  setType: function(el) { setType(el.dataset.type); },
+  toggleFile: function(el) {
+    const row = el.closest('[data-path]');
+    if (row) toggleFile(row.dataset.path);
+  },
+  removeFooter: function(el) { removeFooter(+el.dataset.idx); },
+};
+
+document.body.addEventListener('click', function(e) {
+  const el = e.target.closest('[data-action]');
+  if (!el) return;
+  e.stopPropagation();
+  const action = el.dataset.action;
+  const handler = clickActions[action];
+  if (handler) {
+    if (handler.length > 0) handler(el);
+    else handler();
+  }
+});
+
+const inputActions = {
+  onDescEdit: function(el) { onDescEdit(el.value); },
+  onMsgEdit: function(el) { onMsgEdit(el.value); },
+  onBodyEdit: function(el) { onBodyEdit(el.value); },
+  onBreakingEdit: function(el) { onBreakingEdit(el.value); },
+  onScopeEdit: function(el) { onScopeEdit(el.value); },
+  updateFooterCustomToken: function(el) { updateFooterCustomToken(+el.dataset.idx, el.value); },
+  updateFooterValue: function(el) { updateFooterValue(+el.dataset.idx, el.value); },
+};
+
+document.body.addEventListener('input', function(e) {
+  const action = e.target.dataset.input;
+  if (!action) return;
+  const handler = inputActions[action];
+  if (handler) handler(e.target);
+});
+
+const changeActions = {
+  onAiProviderChange: function(el) { onAiProviderChange(el.value); },
+  onAiModelChange: function(el) { onAiModelChange(el.value); },
+  updateFooterToken: function(el) { updateFooterToken(+el.dataset.idx, el.value); },
+};
+
+document.body.addEventListener('change', function(e) {
+  const action = e.target.dataset.change;
+  if (!action) return;
+  const handler = changeActions[action];
+  if (handler) handler(e.target);
 });
 
 render();

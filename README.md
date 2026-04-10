@@ -1,5 +1,6 @@
 # gimmit
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+[![VS Code Marketplace](https://img.shields.io/badge/VS%20Code%20Marketplace-gimmit-0098FF?logo=visualstudiocode&logoColor=white)](https://marketplace.visualstudio.com/items?itemName=austinfv.gimmit)
 
 **Gimmit** generates clean, conventional commits directly from your changed files — with optional AI-powered descriptions from your actual diffs.
 

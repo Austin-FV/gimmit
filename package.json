@@ -1,10 +1,10 @@
 {
   "name": "gimmit",
   "displayName": "gimmit",
-  "description": "Generate conventional commit commands from your changed files, with optional AI-powered messages.",
+  "description": "Generate conventional commits from your changed files in VS Code, with optional AI-powered descriptions.",
   "version": "1.0.0",
   "engines": { "vscode": "^1.85.0" },
-  "categories": ["SCM Providers"],
+  "categories": ["Other"],
   "activationEvents": [],
   "main": "./out/extension.js",
   "contributes": {
@@ -26,7 +26,7 @@
       "activitybar": [
         {
           "id": "gimmit",
-          "title": "gimmit",
+          "title": "Gimmit",
           "icon": "media/icon.svg"
         }
       ]
@@ -63,6 +63,13 @@
     "git",
     "commit",
     "conventional commits",
+    "conventional commit",
+    "commit message",
+    "git commit",
+    "ai",
+    "productivity",
+    "developer tools",
+    "source control",
     "scm"
   ],
   "repository": {

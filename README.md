@@ -1,37 +1,40 @@
 # gimmit
-
-Generate clean, conventional commit messages directly from your changed files — without leaving VS Code.
-
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 
-<!-- ![Visual Studio Marketplace Version](https://img.shields.io/visual-studio-marketplace/v/YOUR_PUBLISHER.gimmit) -->
-<!-- ![Visual Studio Marketplace Installs](https://img.shields.io/visual-studio-marketplace/i/YOUR_PUBLISHER.gimmit) -->
+**Gimmit** generates clean, conventional commits directly from your changed files — with optional AI-powered descriptions from your actual diffs.
 
-## Demo
+![gimmit demo](./media/demo.gif)
 
-<!-- Replace with a real recording -->
-<!-- ![gimmit demo](./media/demo.gif) -->
+### Stop writing commit messages manually.
 
-🚧 Demo coming soon
+⚡ Select files → pick a type → commit in seconds
 
-> Select files → pick a commit type → generate a ready-to-run git command
-
-## Why gimmit?
-
-Writing conventional commits manually is slow and inconsistent. Gimmit automates it by reading your changed files, suggesting the correct commit type, and generating a ready-to-use command — with optional AI-powered descriptions from your actual diffs.
+<!-- 
+![Version](https://img.shields.io/visual-studio-marketplace/v/YOUR_PUBLISHER.gimmit)
+![Installs](https://img.shields.io/visual-studio-marketplace/i/YOUR_PUBLISHER.gimmit)
+![Rating](https://img.shields.io/visual-studio-marketplace/r/YOUR_PUBLISHER.gimmit) 
+-->
 
 ## Features
 
-- **Conventional commits** — properly formatted every time, with all standard types
-- **AI-powered messages** — optional generation using Anthropic, OpenAI, or Google
-- **Live file tracking** — auto-refreshes from `git status` on save, tab switch, and window focus
-- **Smart type detection** — suggests commit type based on file names and paths
-- **Run or copy** — execute `git add` + `git commit` from the sidebar, or copy to clipboard
-- **Undo support** — 15-second undo window after every commit
-- **Full spec support** — scope, body, footers, and breaking changes
-- **Multi-repo aware** — detects and switches between git repositories across workspaces
-- **Secure key storage** — API keys in your OS keychain via VS Code SecretStorage
-- **Zero dependencies** — all AI calls use Node.js built-in `https`
+- ⚡ **Instant commits** — generate and run commits in seconds  
+- 🤖 **AI-powered descriptions** — optional, based on real diffs  
+- 🎯 **Smart type detection** — auto-suggests commit type  
+- 🧠 **Full conventional commit support** — scope, body, footers, breaking changes  
+- 🔄 **Live file tracking** — always synced with git status  
+- 🔁 **Undo commits** — 15-second rollback window  
+- 🔐 **Secure API keys** — stored in OS keychain  
+- 🧩 **Multi-repo support** — works across workspaces  
+
+## Install
+
+1. Open **VS Code**
+2. Go to **Extensions**
+3. Search for **gimmit**
+4. Click **Install**
+
+<!-- Or install from the Marketplace:
+👉 [Install gimmit](https://marketplace.visualstudio.com/items?itemName=YOUR_PUBLISHER.gimmit) -->
 
 ## Commands
 
@@ -41,16 +44,14 @@ Writing conventional commits manually is slow and inconsistent. Gimmit automates
 | `Gimmit: Set API Key`    | Open the API key manager (provider picker → secure input) |
 | `Gimmit: Manage API Key` | Manage a specific provider's API key (replace or delete) |
 
-## Usage
+## Quick Start
 
-1. Open a git repository in VS Code
-2. Make some changes to files
-3. Open the **Gimmit** panel in the activity bar
-4. Select which files to include in the commit
-5. Choose a commit type — gimmit suggests one automatically
-6. Adjust the message if needed, or click **✦** to generate one with AI
-7. Optionally add a body, footers, or mark as a breaking change
-8. Click **Run** to commit directly, or **Copy** to paste into your terminal
+1. Open the **Gimmit** sidebar
+2. Select changed files
+3. Choose a commit type (auto-suggested)
+4. Click **Run**
+
+Done — your commit is created.
 
 **Basic example:**
 
@@ -172,6 +173,9 @@ vsce publish
 ```
 
 Requires a [Personal Access Token](https://dev.azure.com) with Marketplace publish permissions and a publisher ID from [marketplace.visualstudio.com](https://marketplace.visualstudio.com).
+
+## Release Notes
+Detailed Release Notes are available [here](CHANGELOG.md).
 
 ## License
 

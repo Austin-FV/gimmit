@@ -1,24 +1,40 @@
 # Changelog
 
+All notable changes to this project will be documented in this file.
+
 ## [1.0.0] - 2026-04-10
 
-### Added
+### 🚀 Highlights
+- Full conventional commit workflow directly inside VS Code
+- AI-powered commit generation across Anthropic, OpenAI, and Google
+- Secure API key storage and safe Git execution
+
+### Core Features
 - Conventional commit message builder with type detection (feat, fix, docs, chore, refactor, style, test, perf, build, ci, none)
-- Live file tracking with auto-updates from git status
-- AI-powered commit message and body generation using Anthropic, OpenAI, or Google
-- Secure API key management via OS keychain (VS Code SecretStorage)
 - Run commits directly from the sidebar
-- 15-second undo window after committing
 - Commit body, footers, and breaking change support
 - Scope input for conventional commit scopes
 - Copy-ready git command preview with syntax highlighting
-- Multi-repo and multi-workspace support
+- 15-second undo window after committing
+
+### AI Features
+- AI-powered commit message and body generation using Anthropic, OpenAI, or Google
+- Secure API key management via OS keychain (VS Code SecretStorage)
+
+### Developer Experience
+- Live file tracking with auto-updates from git status
 - Auto-refresh on editor tab switch and window focus
+- Multi-repo and multi-workspace support
+
+### Webview & UI
 - Content Security Policy with nonce-based script execution
 - Error boundary on webview render with retry/refresh fallback
 
 ### Security
-- All git commands use `execFileSync` to prevent shell injection
-- HTML output escaped for `"` and `'` to prevent XSS via attribute breakout
-- CSP-safe event delegation — no inline `onclick`/`oninput`/`onchange` handlers
-- Git diff `maxBuffer` set to 5 MB to handle large repositories
+- Git commands executed using `execFileSync` to prevent shell injection
+- HTML output escaped to prevent XSS via attribute injection
+- CSP-compliant webview with no inline event handlers
+- Git diff buffer capped at 5 MB for safe large-repo handling
+
+### Notes
+- Initial public release

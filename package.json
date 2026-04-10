@@ -2,9 +2,13 @@
   "name": "gimmit",
   "displayName": "gimmit",
   "description": "Generate conventional commits from your changed files in VS Code, with optional AI-powered descriptions.",
-  "version": "1.0.0",
-  "engines": { "vscode": "^1.85.0" },
-  "categories": ["Other"],
+  "version": "1.0.1",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
   "activationEvents": [
     "onCommand:gimmit.open"
   ],

@@ -1,11 +1,9 @@
 # gimmit
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
-[![VS Code Marketplace](https://img.shields.io/badge/VS%20Code-gimmit-0098FF?logo=visualstudiocode&logoColor=white)](https://marketplace.visualstudio.com/items?itemName=austinfv.gimmit)
-[![Open VSX Registry](https://img.shields.io/badge/Open%20VSX-gimmit-C160EF)](https://open-vsx.org/extension/austinfv/gimmit)
+[![VS Code](https://img.shields.io/badge/VS%20Code-007ACC?logo=visual-studio-code&logoColor=white)](https://marketplace.visualstudio.com/items?itemName=austinfv.gimmit)
+[![Open VSX](https://img.shields.io/badge/Open%20VSX-C160EF)](https://open-vsx.org/extension/austinfv/gimmit)
 
 **Gimmit** generates clean, conventional commits directly from your changed files — with optional AI-powered descriptions from your actual diffs.
-
-Available on **VS Code** and **Cursor**.
 
 ![gimmit demo](./media/demo.gif)
 

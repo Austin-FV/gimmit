@@ -1,8 +1,11 @@
 # gimmit
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
-[![VS Code Marketplace](https://img.shields.io/badge/VS%20Code%20Marketplace-gimmit-0098FF?logo=visualstudiocode&logoColor=white)](https://marketplace.visualstudio.com/items?itemName=austinfv.gimmit)
+[![VS Code Marketplace](https://img.shields.io/badge/VS%20Code-gimmit-0098FF?logo=visualstudiocode&logoColor=white)](https://marketplace.visualstudio.com/items?itemName=austinfv.gimmit)
+[![Open VSX Registry](https://img.shields.io/badge/Open%20VSX-gimmit-C160EF)](https://open-vsx.org/extension/austinfv/gimmit)
 
 **Gimmit** generates clean, conventional commits directly from your changed files — with optional AI-powered descriptions from your actual diffs.
+
+Available on **VS Code** and **Cursor**.
 
 ![gimmit demo](./media/demo.gif)
 
@@ -23,13 +26,17 @@
 
 ## Install
 
-1. Open **VS Code**
-2. Go to **Extensions**
-3. Search for **gimmit**
-4. Click **Install**
+### VS Code or Cursor
+1. Open **Extensions**
+2. Search for **gimmit**
+3. Click **Install**
 
-Or install from the Marketplace:
-👉 [Install gimmit](https://marketplace.visualstudio.com/items?itemName=austinfv.gimmit)
+👉 [Install gimmit on VS Code](https://marketplace.visualstudio.com/items?itemName=austinfv.gimmit)
+
+### Other VS Code-compatible editors
+`gimmit` is also published on **Open VSX** for compatibility with other VS Code-compatible editors.
+
+👉 [Download gimmit from Open VSX](https://open-vsx.org/extension/austinfv/gimmit)
 
 ## Commands
 
@@ -152,13 +159,13 @@ npm run watch
 
 ```bash
 npm install -g @vscode/vsce
-vsce package        # produces gimmit-1.0.0.vsix
+vsce package        # produces gimmit-1.X.X.vsix
 ```
 
 Install locally:
 
 ```bash
-code --install-extension gimmit-1.0.0.vsix
+code --install-extension gimmit-1.X.X.vsix
 ```
 
 Publish:

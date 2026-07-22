@@ -153,26 +153,40 @@ Press **F5** to launch an Extension Development Host with gimmit loaded.
 npm run watch
 ```
 
-### Packaging
+### Releasing
+
+Ships to both the **VS Code Marketplace** (`vsce`) and **Open VSX** (`ovsx`). Build once, publish the same `.vsix` to both.
+
+**1.** Bump `version` in `package.json` and add a `CHANGELOG.md` entry. Version numbers can't be reused.
+
+**2.** Clean rebuild — `tsc` doesn't delete output for removed source files:
 
 ```bash
-npm install -g @vscode/vsce
-vsce package        # produces gimmit-1.X.X.vsix
+rm -rf out
+npm run compile
 ```
 
-Install locally:
+**3.** Package and test locally:
 
 ```bash
+vsce package
 code --install-extension gimmit-1.X.X.vsix
 ```
 
-Publish:
+**4.** Commit and push — `vsce` won't check git state.
+
+**5.** Publish to the Marketplace (`--packagePath` ships the file you just tested):
 
 ```bash
-vsce publish
+vsce publish --packagePath gimmit-1.X.X.vsix
 ```
 
-Requires a [Personal Access Token](https://dev.azure.com) with Marketplace publish permissions and a publisher ID from [marketplace.visualstudio.com](https://marketplace.visualstudio.com).
+**6.** Publish to Open VSX. Token comes from [open-vsx.org](https://open-vsx.org) → avatar → Settings → Access Tokens, and is shown only once:
+
+```bash
+$env:OVSX_PAT = "your-token"
+npx ovsx publish gimmit-1.X.X.vsix
+```
 
 ## Release Notes
 Detailed Release Notes are available [here](CHANGELOG.md).

@@ -446,12 +446,17 @@ export function getStyles(): string {
 
   .cmd-section{
     flex-shrink:0;
+    display:flex;
+    flex-direction:column;
+    max-height:50vh;
     padding:10px 12px;
     background:var(--vscode-sideBar-background);
     border-top:1px solid var(--vscode-input-border, transparent);
   }
   .cmd-box{
     position:relative;
+    flex:1 1 auto;
+    min-height:0;
     background:var(--vscode-textCodeBlock-background, var(--vscode-input-background));
     border:1px solid var(--vscode-input-border, transparent);
     border-radius:3px;
@@ -462,6 +467,7 @@ export function getStyles(): string {
     white-space:pre-wrap; /* was pre — this enables wrapping */
     word-break:break-all;
     overflow-x:hidden; /* no more horizontal scroll */
+    overflow-y:auto;
   }
   .cmd-line{display:block}
   .ck{color:var(--vscode-symbolIcon-keywordForeground, #569cd6)}

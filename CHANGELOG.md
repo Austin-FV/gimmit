@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.2] - 2026-07-21
+
+### Fixed
+- Git Command section no longer expands to fill the entire panel when many files are selected — it is now capped at half the view height and scrolls internally, keeping file selection, commit message, and AI controls accessible
+
 ## [1.0.1] - 2026-04-10
 
 ### Changed
